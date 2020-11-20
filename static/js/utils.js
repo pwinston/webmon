@@ -1,30 +1,27 @@
-//all "global" variables are contained within params object
+// util.js
+//
+// Utilities for viewer.js
+///
 var externalParams;
 function defineExternalParams() {
 	externalParams = new function () {
-
-		//for sphere
-		this.radius = 5.;
-		this.widthSegments = 32;
-		this.heightSegments = 32;
-		this.phiStart = 0;
-		this.phiLength = 2. * Math.PI;
-		this.thetaStart = 0;
-		this.thetaLength = Math.PI;
-
-
+		this.showGrid = false;
 	};
-
-
 }
 
-//all "global" variables are contained within params object
+var tileConfig;
+function defineTileConfig() {
+	tileConfig = new function () {
+		this.rows = 5;
+		this.cols = 5;
+	};
+}
+
 var tileState;
 function defineTileState() {
 	tileState = new function () {
-		this.rows = 5;
-		this.cols = 5;
 		this.seen = [];
+		this.tiles = [];
 	};
 }
 
