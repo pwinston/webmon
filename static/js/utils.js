@@ -5,7 +5,7 @@
 var externalParams;
 function defineExternalParams() {
 	externalParams = new function () {
-		this.showGrid = false;
+		this.show_grid = false;
 	};
 }
 

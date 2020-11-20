@@ -42,28 +42,34 @@ tile_update_rate = 1.0
 
 last_frame_number = None
 
-# some dummy data
-data = [{'foo': [1, 2, 3, 4], 'fee': 'hello'}]
-data_json = json.dumps(data)
+# Some dummy data. Not sure what this is for, configuring the browser that
+# connected to us?
+input_data_response = [{'foo': [1, 2, 3, 4], 'fee': 'hello'}]
 
 
-def _send_to_viewer(client):
+def _send_to_viewer(client) -> None:
+    """Send data to the connected viewer."""
+    state = client.napari_state
 
-    socketio.emit('set_tile_config', client.tile_config, namespace='/test')
-    print(json.dumps(client.tile_config))
-    socketio.emit('set_tile_state', client.tile_state, namespace='/test')
-    print(json.dumps(client.tile_state))
+    if state.tile_config is not None:
+        print(json.dumps(state.tile_config))
+        socketio.emit('set_tile_config', state.tile_config, namespace='/test')
+
+    if state.tile_state is not None:
+        print(json.dumps(client.tile_state))
+        socketio.emit('set_tile_state', client.tile_state, namespace='/test')
 
 
-# this will pass to the viewer every "seconds"
-def background_thread():
-    """Example of how to send server generated events to clients."""
+def background_thread() -> None:
+    """Send data to/from the viewer and napari."""
     global params, updateParams
     while True:
+        # Pass data from viewer to the napari client.
         socketio.sleep(seconds)
         if updateParams and napari_client is not None:
             napari_client.set_params(params)
 
+        # If napari client has new data, pass it to the viewer.
         global last_frame_number
         if napari_client.frame_number != last_frame_number:
             _send_to_viewer(napari_client)
@@ -72,7 +78,7 @@ def background_thread():
         updateParams = False
 
 
-# testing the connection
+# Testing the connection.
 @socketio.on('connection_test', namespace='/test')
 def connection_test(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
@@ -82,11 +88,11 @@ def connection_test(message):
     )
 
 
-# sending data
+# Sending data.
 @socketio.on('input_data_request', namespace='/test')
 def input_data_request(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
-    emit('input_data_response', data_json)
+    emit('input_data_response', json.dumps(input_data_response))
 
 
 # Receive data from viewers.
@@ -109,13 +115,13 @@ def from_gui():
             thread = socketio.start_background_task(target=background_thread)
 
 
+# We just have one page, but could have many.
 @app.route("/viewer")
 def viewer():
     return render_template("viewer.html")
 
 
 if __name__ == "__main__":
-    print("************************MAIN")
-    napari_client = create_napari_client()
+    print("Webmon: Starting...")
+    napari_client = create_napari_client("webmon")
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
-

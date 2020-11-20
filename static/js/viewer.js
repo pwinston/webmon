@@ -164,7 +164,7 @@ function createGUI() {
 	//setParamsFromURL();  // not using this?
 
 	internalParams.gui = new dat.GUI();
-	internalParams.gui.add(externalParams, 'showGrid').onChange(sendGUIinfo);
+	internalParams.gui.add(externalParams, 'show_grid').onChange(sendGUIinfo);
 }
 
 
