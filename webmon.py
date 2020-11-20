@@ -13,7 +13,7 @@ from threading import Lock
 from flask import Flask, render_template, request, session
 from flask_socketio import SocketIO, emit
 
-from napari_client import create_napari_client
+from napari_client import create_napari_client, NapariState
 
 app = Flask(__name__)
 
@@ -47,17 +47,15 @@ last_frame_number = None
 input_data_response = [{'foo': [1, 2, 3, 4], 'fee': 'hello'}]
 
 
-def _send_to_viewer(client) -> None:
+def _send_to_viewer(state: NapariState) -> None:
     """Send data to the connected viewer."""
-    state = client.napari_state
-
     if state.tile_config is not None:
         print(json.dumps(state.tile_config))
         socketio.emit('set_tile_config', state.tile_config, namespace='/test')
 
     if state.tile_state is not None:
-        print(json.dumps(client.tile_state))
-        socketio.emit('set_tile_state', client.tile_state, namespace='/test')
+        print(json.dumps(state.tile_state))
+        socketio.emit('set_tile_state', state.tile_state, namespace='/test')
 
 
 def background_thread() -> None:
@@ -72,7 +70,7 @@ def background_thread() -> None:
         # If napari client has new data, pass it to the viewer.
         global last_frame_number
         if napari_client.frame_number != last_frame_number:
-            _send_to_viewer(napari_client)
+            _send_to_viewer(napari_client.napari_state)
             last_frame_number = napari_client.frame_number
 
         updateParams = False
