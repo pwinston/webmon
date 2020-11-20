@@ -50,11 +50,9 @@ input_data_response = [{'foo': [1, 2, 3, 4], 'fee': 'hello'}]
 def _send_to_viewer(state: NapariState) -> None:
     """Send data to the connected viewer."""
     if state.tile_config is not None:
-        print(json.dumps(state.tile_config))
         socketio.emit('set_tile_config', state.tile_config, namespace='/test')
 
     if state.tile_state is not None:
-        print(json.dumps(state.tile_state))
         socketio.emit('set_tile_state', state.tile_state, namespace='/test')
 
 
@@ -96,9 +94,6 @@ def input_data_request(message):
 # Receive data from viewers.
 @socketio.on('gui_input', namespace='/test')
 def gui_input(message):
-    print("gui_input received:")
-    print(message)
-
     global params, updateParams
     updateParams = True
     params = message

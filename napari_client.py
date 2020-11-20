@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import time
 import os
 import json
+from multiprocessing.managers import SharedMemoryManager
 from multiprocessing.shared_memory import ShareableList
 import base64
 from threading import Thread
@@ -15,6 +16,7 @@ from threading import Thread
 FRAME_NUMBER = 0
 FROM_NAPARI = 1
 TO_NAPARI = 2
+BUFFER_SIZE = 1024 * 1024
 
 
 @dataclass
@@ -25,9 +27,10 @@ class NapariState:
     but for now to be clear and in case it's helpful.
     """
 
-    # Defaults for data we expect to read from napari. The web server uses
-    # this, but we should probably design the web side so that no defaults
-    # are required.
+    data: dict = None  # Full data from napari
+
+    # Split out, but this probably not needed if we just shuttle
+    # it all to the web viewer.
     tile_config: dict = None
     tile_state: dict = None
 
@@ -38,16 +41,28 @@ class NapariState:
         different version of napari, or it's just configured differently
         that we expect. No don't crash no matter what.
         """
+        updated = False
 
+        # TODO_MON: this is horrible, need a general way, the only
+        # reason we care if it changed it not spamming the log
+        # with the identical values every frame.
         try:
-            self.tile_config = data['tile_config']
+            new_data = data['tile_config']
+            if self.tile_config != new_data:
+                self.tile_config = new_data
+                updated = True
         except KeyError:
             pass
 
         try:
-            self.tile_state = data['tile_state']
+            new_data = data['tile_state']
+            if self.tile_state != new_data:
+                self.tile_state = new_data
+                updated = True
         except KeyError:
             pass
+
+        return updated
 
 
 def _get_client_config() -> dict:
@@ -93,6 +108,10 @@ class MonitorClient(Thread):
         self.config = config
         self.client_name = client_name
         self.napari_state = NapariState()
+
+        SharedMemoryManager.register('test_callable')
+        self.manager = SharedMemoryManager()
+        self.manager.start()
 
         # We update this with the last frame we've received from napari.
         self.frame_number = 0
@@ -150,17 +169,18 @@ class MonitorClient(Thread):
 
     def _on_new_frame(self, frame_number) -> None:
         """There is a new frame, grab the latest JSON blob."""
-        self._log(f"Frame number:{frame_number}")
-
         # Get the JSON blob frame shared memory.
         json_str = self.shared_list[FROM_NAPARI].rstrip()
-        data = json.loads(json_str)
 
-        # As debug, print it out.
-        self._log(f"Data from napari: {json_str}")
+        try:
+            data = json.loads(json_str)
 
-        # Process the new information from napari.
-        self.napari_state.update(data)
+            # Process the new information from napari.
+            if self.napari_state.update(data):
+                self._log(f"New data from napari: {json_str}")
+
+        except json.decoder.JSONDecodeError:
+            self._log(f"Could not parse data from napari: {json_str}")
 
     def set_params(self, params) -> None:
         """Send new Web UI state to napari.
@@ -171,7 +191,12 @@ class MonitorClient(Thread):
         if self.connected:
             json_str = json.dumps(params)
             self._log(f"Pass params to napari {json_str}")
-            self.shared_list[TO_NAPARI] = json.dumps(json_str)
+            self._log(f"Writing {len(json_str)} characters to TO_NAPARI")
+            self.shared_list[TO_NAPARI] = json_str
+
+    def stop(self) -> None:
+        """Call on shutdown. TODO_MON: no on calls this yet."""
+        self.manager.shutdown()
 
 
 def create_napari_client(client_name) -> MonitorClient:
