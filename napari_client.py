@@ -138,7 +138,7 @@ class MonitorClient(Thread):
         """See if there is now information in shared mem."""
 
         # Check napari's current frame.
-        frame_number = self.shared_list[SLOT_FRAME_NUMBER]
+        frame_number = self.shared_list[FRAME_NUMBER]
 
         # If we already processed this frame, bail out.
         if frame_number == self.frame_number:
@@ -146,18 +146,18 @@ class MonitorClient(Thread):
 
         # Process this new frame.
         self._on_new_frame(frame_number)
-        self.from_number = frame_number
+        self.frame_number = frame_number
 
     def _on_new_frame(self, frame_number) -> None:
         """There is a new frame, grab the latest JSON blob."""
         self._log(f"Frame number:{frame_number}")
 
         # Get the JSON blob frame shared memory.
-        json_str = shared_list[FROM_NAPARI].rstrip()
+        json_str = self.shared_list[FROM_NAPARI].rstrip()
         data = json.loads(json_str)
 
         # As debug, print it out.
-        print(json_str)
+        self._log("Data from napari: {json_str}")
 
         # Process the new information from napari.
         self.napari_state.update(data)
@@ -169,7 +169,9 @@ class MonitorClient(Thread):
         For now we just throw it in and expect napari to read it out.
         """
         if self.connected:
-            self.shared_list[TO_NAPARI] = json.dumps(params)
+            json_str = json.dumps(params)
+            self._log("Pass params to napari {json_str")
+            self.shared_list[TO_NAPARI] = json.dumps(json_str)
 
 
 def create_napari_client(client_name) -> MonitorClient:
