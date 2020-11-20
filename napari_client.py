@@ -157,7 +157,7 @@ class MonitorClient(Thread):
         data = json.loads(json_str)
 
         # As debug, print it out.
-        self._log("Data from napari: {json_str}")
+        self._log(f"Data from napari: {json_str}")
 
         # Process the new information from napari.
         self.napari_state.update(data)
@@ -170,7 +170,7 @@ class MonitorClient(Thread):
         """
         if self.connected:
             json_str = json.dumps(params)
-            self._log("Pass params to napari {json_str")
+            self._log(f"Pass params to napari {json_str}")
             self.shared_list[TO_NAPARI] = json.dumps(json_str)
 
 
