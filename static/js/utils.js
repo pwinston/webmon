@@ -5,7 +5,7 @@
 
 // We define or ortho camera to view the space [0..1], but then we zoom
 // a bit so that area has a border around it.
-ZOOM = 0.5;
+ZOOM = 0.8;
 
 var externalParams;
 function defineExternalParams() {
