@@ -6,7 +6,12 @@ from dataclasses import dataclass
 import time
 import os
 import json
-from multiprocessing.managers import SharedMemoryManager
+import sys
+from multiprocessing.managers import (
+    SharedMemoryManager,
+    Server,
+    SharedMemoryServer,
+)
 from multiprocessing.shared_memory import ShareableList
 import base64
 from threading import Thread
@@ -109,9 +114,18 @@ class MonitorClient(Thread):
         self.client_name = client_name
         self.napari_state = NapariState()
 
+        server_port = config['server_port']
+        self._log(f"Connecting to port {server_port}...")
+
         SharedMemoryManager.register('test_callable')
-        self.manager = SharedMemoryManager()
-        self.manager.start()
+        self.manager = SharedMemoryManager(
+            address=('localhost', config['server_port']),
+            authkey=str.encode('napari'),
+        )
+        self.manager.connect()
+
+        value = self.manager.test_callable()
+        print(f"TEST CALLABLE RETURNED: {value}")
 
         # We update this with the last frame we've received from napari.
         self.frame_number = 0
