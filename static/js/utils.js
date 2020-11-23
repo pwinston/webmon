@@ -2,6 +2,11 @@
 //
 // Utilities for viewer.js
 ///
+
+// We define or ortho camera to view the space [0..1], but then we zoom
+// a bit so that area has a border around it.
+ZOOM = 0.5;
+
 var externalParams;
 function defineExternalParams() {
 	externalParams = new function () {
@@ -14,6 +19,9 @@ function defineTileConfig() {
 	tileConfig = new function () {
 		this.rows = 5;
 		this.cols = 5;
+
+		// The full base image shape, might be huge like (100000, 100000).
+		this.baseShape = 0;
 	};
 }
 
@@ -21,7 +29,10 @@ var tileState;
 function defineTileState() {
 	tileState = new function () {
 		this.seen = [];
+		this.corners = [[0, 0], [1, 1]];
+		this.normalized = [];
 		this.tiles = [];
+		this.view = [];
 	};
 }
 
@@ -32,6 +43,7 @@ function defineInternalParams() {
 		this.container = null;
 		this.renderer = null;
 		this.scene = null;
+		this.group = null;
 
 		//for frustum      
 		this.zmax = 5.e10;
@@ -78,9 +90,9 @@ function setParamsFromURL() {
 //this initializes everything needed for the scene
 function initScene() {
 
-	var screenWidth = window.innerWidth;
-	var screenHeight = window.innerHeight;
-	var aspect = screenWidth / screenHeight;
+	const screenWidth = window.innerWidth;
+	const screenHeight = window.innerHeight;
+	const aspect = screenWidth / screenHeight;
 
 	// renderer
 	internalParams.renderer = new THREE.WebGLRenderer({
@@ -94,19 +106,30 @@ function initScene() {
 	// scene
 	internalParams.scene = new THREE.Scene();
 
-	// camera
-	internalParams.camera = new THREE.PerspectiveCamera(internalParams.fov, aspect, internalParams.zmin, internalParams.zmax);
-	internalParams.camera.up.set(0, -1, 0);
-	internalParams.camera.position.z = 30;
-	internalParams.scene.add(internalParams.camera);
+
+	internalParams.group = new THREE.Group();
+	internalParams.scene.add(internalParams.group);
+
+	const height = 1;
+	const width = height * aspect;
+	const near = 0;
+	const far = 1;
+
+
+	// Camera
+	var camera = new THREE.OrthographicCamera(
+		0, width, height, 0, near, far);
+	internalParams.scene.add(camera);
+	camera.zoom = ZOOM;
+	camera.updateProjectionMatrix();
+
+	internalParams.camera = camera
 
 	// events
 	THREEx.WindowResize(internalParams.renderer, internalParams.camera);
 
 	//controls
 	internalParams.controls = new THREE.TrackballControls(internalParams.camera, internalParams.renderer.domElement);
-
-
 }
 
 function setURLvars() {

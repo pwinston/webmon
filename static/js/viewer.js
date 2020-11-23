@@ -3,28 +3,36 @@
 // Proof of Concept Napari Monitor WebUI
 // Modified from https://github.com/ageller/FlaskTest
 //
-function setParams(vars) {
-	var keys = Object.keys(vars);
-	keys.forEach(function (k) {
-		externalParams[k] = parseFloat(vars[k])
-	});
-	//drawSphere()
-}
+
+// Draw the axes (red=X green=Y).
+SHOW_AXES = true;
+
+// Draw the tiles themselves.
+SHOW_TILES = true;
+
+// Draw the rect depicting Napari's current view frustum.
+SHOW_VIEW = true;
+
 
 function setTileConfig(msg) {
-	newRows = parseInt(msg.rows);
-	newCols = parseInt(msg.cols);
+	newRows = parseInt(msg.shape_in_tiles[0]);
+	newCols = parseInt(msg.shape_in_tiles[1]);
 	if (tileConfig.rows != newRows || tileConfig.cols != newCols) {
 		tileConfig.rows = newRows;
 		tileConfig.cols = newCols;
-		console.log("***********CREATE")
-		createTiles();
+		tileConfig.baseShape = msg.base_shape;
+
+		if (SHOW_TILES) {
+			createTiles();
+		}
 	}
 }
 
 function setTileState(msg) {
 	tileState.seen = msg.seen;
-	drawTiles();
+	tileState.normalized = msg.normalized;
+	tileState.corners = msg.corners;
+	updateTiles();
 }
 
 // References:
@@ -50,10 +58,6 @@ function connectSocketInput() {
 			console.log("data received", msg);
 		});
 
-		internalParams.socket.on('update_params', function (msg) {
-			setParams(msg);
-		});
-
 		internalParams.socket.on('set_tile_config', function (msg) {
 			setTileConfig(msg);
 		});
@@ -65,25 +69,84 @@ function connectSocketInput() {
 }
 
 // Tile colors
-TILE_OFF = 0xa3a2a0; // gray
-TILE_ON = 0xE11313;  // red
+COLOR_TILE_OFF = 0xa3a2a0; // gray
+COLOR_TILE_ON = 0xE11313;  // red
+COLOR_VIEW = 0xF5C542; // yellow
+
+TILE_GAP = 0.1; // fraction of the tile size
+
+function addToScene(object) {
+	internalParams.group.add(object);
+}
+
+function removeFromScene(object) {
+	internalParams.group.remove(object);
+}
+
+function drawLine(start, end, color) {
+	const points = [];
+	console.log("start=", start);
+	points.push(new THREE.Vector2(...start));
+	points.push(new THREE.Vector2(...end));
+	var material = new THREE.LineBasicMaterial({
+		color: color
+	});
+
+	const geometry = new THREE.BufferGeometry().setFromPoints(points);
+	const line = new THREE.Line(geometry, material);
+	addToScene(line);
+}
+
+function createAxes() {
+	const depth = -1;
+	origin = [0, 0, depth];
+	y_axes = [0, 1, depth];
+	x_axes = [1, 0, depth];
+	drawLine(origin, x_axes, 0xFF0000);
+	drawLine(origin, y_axes, 0x00FF00);
+}
+
+//
+// Create a 1x1 rectangle with center at (0, 0) so we can 
+// scale/move it into position.
+//
+function createRect(rectColor) {
+	var geometry = new THREE.PlaneGeometry(1, 1);
+	var material = new THREE.MeshBasicMaterial({
+		color: rectColor
+	});
+	var mesh = new THREE.Mesh(geometry, material);
+
+	// Defaults to all zeros? Lets be explicit for now.
+	mesh.position.x = 0;
+	mesh.position.y = 0;
+	mesh.position.z = 0;
+
+	addToScene(mesh);
+	return mesh;
+}
+
 
 //
 // Create one tile mesh, later we toggle the color
 //
-function createTile(size, row, col) {
-	var width = 0.4;
-	var height = 0.4;
-	var x = col * 0.5;
-	var y = row * 0.5;
-	var geometry = new THREE.PlaneGeometry(width, height);
-	var material = new THREE.MeshBasicMaterial({
-		color: TILE_OFF
-	});
-	var mesh = new THREE.Mesh(geometry, material);
-	mesh.position.x = (size * width) - x;
-	mesh.position.y = y;
-	internalParams.scene.add(mesh);
+function createTile(row, col, tileSize) {
+	var mesh = createRect(COLOR_TILE_OFF);
+
+	const rectSize = tileSize - (TILE_GAP * tileSize);
+
+	const scale = [rectSize, rectSize];
+	mesh.scale.set(...scale);
+
+	// Default rect is [-0.5 .. 0.5] with [0, 0] center. We move it
+	// by half since we want our tile's corner to be at the given
+	// coordinates.
+	// 
+	const half = rectSize / 2;
+
+	mesh.position.x = col * tileSize + half;
+	mesh.position.y = row * tileSize + half;
+
 	return mesh;
 }
 
@@ -91,88 +154,142 @@ function createTile(size, row, col) {
 // Create all the tiles meshes, in the current grid size.
 //
 function createTiles() {
-	// Remove all the old ones for now. Could move them around...
+
+	// Remove all the old ones for now.
 	tileState.tiles.forEach(function (tile) {
-		internalParams.scene.remove(tile);
+		removeFromScene(tile);
 	})
 
-	// Starting over with no tiles.
+	// Start over with no tiles.
 	tileState.tiles = [];
 
-	var rows = tileConfig.rows;
+	var rows = tileConfig.rows
 	var cols = tileConfig.cols;
+
+	const tileSize = 1 / rows;
+
 	console.log("Create tiles", rows, cols);
 
 	// Add in order so that index = row * cols + col
 	for (row = 0; row < rows; row++) {
 		for (col = 0; col < cols; col++) {
-			tileState.tiles.push(createTile(rows, row, col));
+			const tile = createTile(row, col, tileSize)
+			tileState.tiles.push(tile);
 		}
 	}
 }
 
 //
-// Draw the tiles (just set the colors right now).
+// Move the view rect to the current position/size.
 //
-function drawTiles() {
+function moveView() {
+	const baseX = tileConfig.baseShape[1];
+	const baseY = tileConfig.baseShape[0];
+
+	const x0 = tileState.corners[0][1] / baseX;
+	const y0 = tileState.corners[0][0] / baseY;
+	const x1 = tileState.corners[1][1] / baseX;
+	const y1 = tileState.corners[1][0] / baseY;
+
+	const width = x1 - x0;
+	const height = y1 - y0;
+
+	const pos = [x0 + width / 2, y0 + height / 2];
+	const scale = [width, height];
+
+	console.log(x0, y0);
+
+	moveViewRect(pos, scale)
+}
+
+function moveViewRect(pos, scale) {
+	console.log("moveViewRect: ", pos, scale);
+	tileState.view.scale.set(...scale);
+	tileState.view.position.x = pos[0];
+	tileState.view.position.y = pos[1];
+	tileState.view.position.z = 0;
+}
+
+function updateTileColors() {
 	var rows = tileConfig.rows;
 	var cols = tileConfig.cols;
 
-	var seen_map = new Map();
+	var seenMap = new Map();
 
 	// Populate seen_map so we can set the colors based on it.
 	tileState.seen.forEach(function (coords) {
 		const row = parseInt(coords[0]);
 		const col = parseInt(coords[1]);
 		const index = row * cols + col;
-		seen_map.set(index, 1);
+		seenMap.set(index, 1);
 	});
+
+	console.log("Drawing ", seenMap.size);
 
 	// Set the colors of all the tiles.
 	for (row = 0; row < rows; row++) {
 		for (col = 0; col < cols; col++) {
 			const index = row * cols + col;
-			color = seen_map.has(index) ? TILE_ON : TILE_OFF;
+			color = seenMap.has(index) ? COLOR_TILE_ON : COLOR_TILE_OFF;
 			tileState.tiles[index].material.color.set(color);
 		}
 	}
 }
+//
+// Draw the tiles (just set the colors right now).
+//
+function updateTiles() {
+	if (SHOW_TILES) {
+		updateTileColors();
+	}
+
+	if (SHOW_VIEW)
+		moveView();
+}
 
 // 
-// Draw the scene. Only called on startup.
-// TODO: Switch to 2D/ortho camera!
+// Only called on startup, after that we modify things on the fly.
 //
-function drawViewer() {
+function createViewer() {
 
-	createTiles();
-	drawTiles();
+	internalParams.group.position.y = 1;
+	internalParams.group.scale.set(1, -1, 1);
+
+
+	if (SHOW_VIEW) {
+		tileState.view = createRect(COLOR_VIEW);
+	}
+
+	if (SHOW_TILES) {
+		createTiles();
+	}
+
+	if (SHOW_AXES)
+		createAxes();
 
 	var lights = [];
 	lights[0] = new THREE.PointLight(0xffffff, 1, 0);
-
 	lights[0].position.set(0, 200, 0);
 
 	lights.forEach(function (element) {
-		internalParams.scene.add(element);
-	})
+		addToScene(element);
+	});
 }
 
 //
-// Create GUI. Just one checkbox!
+// Create the GUI.
 //
 function createGUI() {
-	//setParamsFromURL();  // not using this?
-
 	internalParams.gui = new dat.GUI();
 	internalParams.gui.add(externalParams, 'show_grid').onChange(sendGUIinfo);
 }
 
-
+//
+// Send the from GUI back to Flask.
+//
 function sendGUIinfo() {
-	//send the information from the GUI back to the flask app, and then on to the viewer
-	internalParams.socket.emit('gui_input', externalParams);
 
-	//setURLvars() // not using this?
+	internalParams.socket.emit('gui_input', externalParams);
 }
 
 //
@@ -192,11 +309,13 @@ function startViewer() {
 
 	defineInternalParams();
 	defineExternalParams();
+
 	defineTileState();
 	defineTileConfig();
 
 	initScene();
 	createGUI();
-	drawViewer();
+
+	createViewer();
 	animateViewer();
 }
