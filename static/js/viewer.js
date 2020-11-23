@@ -1,6 +1,8 @@
 // viewer.js
 //
-// Proof of Concept Napari Monitor WebUI
+// Proof of Concept Napari Monitor WebUI. Right now focusing just on the 
+// display of the octree tiles and the view into those.
+//
 // Modified from https://github.com/ageller/FlaskTest
 //
 
@@ -110,12 +112,26 @@ function createAxes() {
 // Create a 1x1 rectangle with center at (0, 0) so we can 
 // scale/move it into position.
 //
-function createRect(rectColor) {
+function createRect(rectColor, onTop = false) {
+
 	var geometry = new THREE.PlaneGeometry(1, 1);
 	var material = new THREE.MeshBasicMaterial({
 		color: rectColor
 	});
+
+	if (onTop) {
+		// For now we'll make onTop imply transparent...
+		material.transparent = true;
+		material.opacity = 0.8;
+	}
+
 	var mesh = new THREE.Mesh(geometry, material);
+
+	if (onTop) {
+		// Depth/order puts it on top.
+		material.depthTest = false;
+		mesh.renderOrder = 10;
+	}
 
 	// Defaults to all zeros? Lets be explicit for now.
 	mesh.position.x = 0;
@@ -257,7 +273,7 @@ function createViewer() {
 
 
 	if (SHOW_VIEW) {
-		tileState.view = createRect(COLOR_VIEW);
+		tileState.view = createRect(COLOR_VIEW, true);
 	}
 
 	if (SHOW_TILES) {
