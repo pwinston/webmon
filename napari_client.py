@@ -23,6 +23,8 @@ FROM_NAPARI = 1
 TO_NAPARI = 2
 BUFFER_SIZE = 1024 * 1024
 
+DUMP_DATA_FROM_NAPARI = False
+
 
 @dataclass
 class NapariState:
@@ -124,7 +126,7 @@ class MonitorClient(Thread):
         )
         self.manager.connect()
 
-        value = self.manager.test_callable()
+        value = self.manager.test_callable(1973)
         print(f"TEST CALLABLE RETURNED: {value}")
 
         # We update this with the last frame we've received from napari.
@@ -191,7 +193,8 @@ class MonitorClient(Thread):
 
             # Process the new information from napari.
             if self.napari_state.update(data):
-                self._log(f"New data from napari: {json_str}")
+                if DUMP_DATA_FROM_NAPARI:
+                    self._log(f"New data from napari: {json_str}")
 
         except json.decoder.JSONDecodeError:
             self._log(f"Could not parse data from napari: {json_str}")
