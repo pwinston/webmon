@@ -23,7 +23,7 @@ LOGGER = logging.getLogger("webmon")
 
 app = Flask(__name__)
 
-napari_client = None
+client = None
 
 # Set this variable to "threading", "eventlet" or "gevent" to test the
 # different async modes, or leave it set to None for the application to choose
@@ -52,21 +52,22 @@ def background_thread() -> None:
     while True:
         socketio.sleep(poll_interval_seconds)
 
-        if napari_client is None:
+        if client is None:
             continue  # Still starting up?
 
         if updateParams:
             # Post data from viewer to napari.
-            napari_client.post_command(params)
+            client.post_command(params)
 
-        if napari_client.napari_data_new:
+        if client.napari_data_new:
             # Set new napari data to viewer
-            data = napari_client.napari_data
-            LOGGER.info("Emit set_tile_data")
+            data = client.napari_data
+            data_len = len(client.last_json_str)
+            LOGGER.info("Emit set_tile_data: %d chars", data_len)
             socketio.emit('set_tile_data', data, namespace='/test')
 
         updateParams = False
-        napari_client.napari_data_new = False
+        client.napari_data_new = False
 
 
 # Testing the connection.
@@ -139,11 +140,11 @@ def main(log_path: str) -> None:
 
     LOGGER.info("Webmon: Starting process %d", os.getpid())
 
-    global napari_client
-    napari_client = create_napari_client("webmon")
+    global client
+    client = create_napari_client("webmon")
 
-    if napari_client is None:
-        print("ERROR: no napari_client was created")
+    if client is None:
+        print("ERROR: no napari client was created")
         return
 
     # Start it up
