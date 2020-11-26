@@ -136,7 +136,14 @@ class MonitorClient(Thread):
             return False  # Stop polling
 
         # Check napari's current frame.
-        frame_number = self.shared_list[FRAME_NUMBER]
+        try:
+            frame_number = self.shared_list[FRAME_NUMBER]
+        except ValueError:
+            # Not sure why we get this ValueError sometimes:
+            # "not enough values to unpack (expected 1, got 0)"
+            # Seems like it should be save to read from a a single
+            # int form a ShareableList! Need to investigate.
+            LOGGER.error("ValueError reading frame index.")
 
         # If we already processed this frame, bail out.
         if frame_number == self.frame_number:
