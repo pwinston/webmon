@@ -1,4 +1,4 @@
-""" webmon.py
+"""webmon
 
 Proof of concept napari monitor client and Flask-SocketIO web server.
 
@@ -7,13 +7,19 @@ sees new information we push it out to any connected web browsers.
 
 Modified from https://github.com/ageller/FlaskTest
 """
+import os
 import json
+import logging
 from threading import Lock
+from pathlib import Path
 
+import click
 from flask import Flask, render_template, request, session
 from flask_socketio import SocketIO, emit
 
-from napari_client import create_napari_client, NapariState
+from napari_client import create_napari_client
+
+LOGGER = logging.getLogger("webmon")
 
 app = Flask(__name__)
 
@@ -35,41 +41,27 @@ params = None
 updateParams = False
 
 # number of seconds between updates
-seconds = 0.01
-
-next_tile_update = 0.0
-tile_update_rate = 1.0
+poll_interval_seconds = 0.01
 
 last_frame_number = None
-
-# Some dummy data. Not sure what this is for, configuring the browser that
-# connected to us?
-input_data_response = [{'foo': [1, 2, 3, 4], 'fee': 'hello'}]
-
-
-def _send_to_viewer(state: NapariState) -> None:
-    """Send data to the connected viewer."""
-    if state.tile_config is not None:
-        socketio.emit('set_tile_config', state.tile_config, namespace='/test')
-
-    if state.tile_state is not None:
-        socketio.emit('set_tile_state', state.tile_state, namespace='/test')
 
 
 def background_thread() -> None:
     """Send data to/from the viewer and napari."""
     global params, updateParams
     while True:
-        # Pass data from viewer to the napari client.
-        socketio.sleep(seconds)
-        if updateParams and napari_client is not None:
-            napari_client.set_params(params)
+        socketio.sleep(poll_interval_seconds)
 
-        # If napari client has new data, pass it to the viewer.
-        global last_frame_number
-        if napari_client.frame_number != last_frame_number:
-            _send_to_viewer(napari_client.napari_state)
-            last_frame_number = napari_client.frame_number
+        if updateParams and napari_client is not None:
+            # Post data from viewer to napari.
+            napari_client.post_command(params)
+
+        if napari_client.napari_data_new:
+            # Set new napari data to viewer
+            data = napari_client.napari_data
+            napari_client.napari_data_new = False
+            LOGGER.info("Emit set_tile_data")
+            socketio.emit('set_tile_data', data, namespace='/test')
 
         updateParams = False
 
@@ -88,7 +80,8 @@ def connection_test(message):
 @socketio.on('input_data_request', namespace='/test')
 def input_data_request(message):
     session['receive_count'] = session.get('receive_count', 0) + 1
-    emit('input_data_response', json.dumps(input_data_response))
+    data = {'client': "webmon", 'pid': os.getpid()}
+    emit('input_data_response', json.dumps(data))
 
 
 # Receive data from viewers.
@@ -114,7 +107,39 @@ def viewer():
     return render_template("viewer.html")
 
 
-if __name__ == "__main__":
-    print("Webmon: Starting...")
+def _log_to_file(path: str) -> None:
+    """Log "napari.async" messages to the given file.
+
+    Parameters
+    ----------
+    path : str
+        Log to this file path.
+    """
+    try:
+        # Nuke/reset log for now.
+        Path(path).unlink()
+    except FileNotFoundError:
+        pass  # It didn't exist yet.
+
+    fh = logging.FileHandler(path)
+    LOGGER.addHandler(fh)
+    LOGGER.setLevel(logging.DEBUG)
+    LOGGER.info("Writing log to %s", path)
+
+
+@click.command()
+@click.option('--log_path', default=None, help="Path to write the log file")
+def main(log_path: str) -> None:
+    """Start webmon and the napari MonitorClient."""
+    if log_path is not None:
+        _log_to_file(log_path)
+
+    LOGGER.info("Webmon: Starting process %d", os.getpid())
+
+    global napari_client
     napari_client = create_napari_client("webmon")
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+
+
+if __name__ == "__main__":
+    main()

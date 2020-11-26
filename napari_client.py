@@ -3,6 +3,7 @@
 This client connects to napari's shared memory monitor.
 """
 from dataclasses import dataclass
+import logging
 import time
 import os
 import json
@@ -16,60 +17,16 @@ from multiprocessing.shared_memory import ShareableList
 import base64
 from threading import Thread
 
+LOGGER = logging.getLogger("webmon")
+
 # Slots in our ShareableList. Some day we should receive these slot numbers
 # from NAPARI_MON_CLIENT config. That would be much more flexible.
 FRAME_NUMBER = 0
 FROM_NAPARI = 1
-TO_NAPARI = 2
+
 BUFFER_SIZE = 1024 * 1024
 
-DUMP_DATA_FROM_NAPARI = False
-
-
-@dataclass
-class NapariState:
-    """State coming from napari.
-
-    May not really need this class. Just pass the full dict around,
-    but for now to be clear and in case it's helpful.
-    """
-
-    data: dict = None  # Full data from napari
-
-    # Split out, but this probably not needed if we just shuttle
-    # it all to the web viewer.
-    tile_config: dict = None
-    tile_state: dict = None
-
-    def update(self, data) -> None:
-        """Process this new data from napari.
-
-        We want to be resilient here in case we are dealing with a
-        different version of napari, or it's just configured differently
-        that we expect. No don't crash no matter what.
-        """
-        updated = False
-
-        # TODO_MON: this is horrible, need a general way, the only
-        # reason we care if it changed it not spamming the log
-        # with the identical values every frame.
-        try:
-            new_data = data['tile_config']
-            if self.tile_config != new_data:
-                self.tile_config = new_data
-                updated = True
-        except KeyError:
-            pass
-
-        try:
-            new_data = data['tile_state']
-            if self.tile_state != new_data:
-                self.tile_state = new_data
-                updated = True
-        except KeyError:
-            pass
-
-        return updated
+DUMP_DATA_FROM_NAPARI = True
 
 
 def _get_client_config() -> dict:
@@ -114,30 +71,36 @@ class MonitorClient(Thread):
         super().__init__()
         self.config = config
         self.client_name = client_name
-        self.napari_state = NapariState()
+
+        LOGGER.info("Starting MonitorClient process %s", os.getpid())
+        self.napari_data = None
+        self.napari_data_new = False
 
         server_port = config['server_port']
-        self._log(f"Connecting to port {server_port}...")
+        LOGGER.info("Connecting to port %d...", server_port)
 
-        SharedMemoryManager.register('test_callable')
-        self.manager = SharedMemoryManager(
+        SharedMemoryManager.register('command_queue')
+
+        self._manager = SharedMemoryManager(
             address=('localhost', config['server_port']),
             authkey=str.encode('napari'),
         )
-        self.manager.connect()
-
-        value = self.manager.test_callable(1973)
-        print(f"TEST CALLABLE RETURNED: {value}")
+        self._manager.connect()
+        self._commands = self._manager.command_queue()
 
         # We update this with the last frame we've received from napari.
         self.frame_number = 0
 
+        # As a quick hack until we have better "changed detection", just
+        # compare the new and old strings.
+        self.last_json_str = None
+
         if self.config is not None:
             # Connect to the shared resources, just one list right now.
             list_name = config['shared_list_name']
-            self._log(f"Connecting to shared list {list_name}")
+            LOGGER.info("Connecting to shared list %s", list_name)
             self.shared_list = ShareableList(name=list_name)
-            self._log(f"Connected to shared list {list_name}")
+            LOGGER.info("Connected to shared list %s", list_name)
 
         # TODO_MON: We need to check if we really connected to napri's
         # share memory or not. Surely there could be errors.
@@ -146,18 +109,10 @@ class MonitorClient(Thread):
         # Start our thread so we can poll napari.
         self.start()
 
-    def _log(self, message) -> None:
-        print(f"Client {self.client_name}: {message}")
-
-    def _log_tiled_data(self, data) -> None:
-        self._log(f"{data['num_created']=}")
-        self._log(f"{data['num_deleted']=}")
-        self._log(f"{data['duration_ms']=}")
-
     def run(self) -> None:
         """Periodically check shared memory for new data."""
 
-        self._log(f"Running...")
+        LOGGER.info(f"Running...")
         while True:
             # Only poll if we are connected, but keep the thread
             # alive either way. Might be useful for debugging.
@@ -172,11 +127,14 @@ class MonitorClient(Thread):
     def _poll(self) -> None:
         """See if there is now information in shared mem."""
 
+        # LOGGER.info("Poll...")
+
         # Check napari's current frame.
         frame_number = self.shared_list[FRAME_NUMBER]
 
         # If we already processed this frame, bail out.
         if frame_number == self.frame_number:
+            # LOGGER.info("Same frame %d", self.frame_number)
             return
 
         # Process this new frame.
@@ -185,35 +143,47 @@ class MonitorClient(Thread):
 
     def _on_new_frame(self, frame_number) -> None:
         """There is a new frame, grab the latest JSON blob."""
+        # LOGGER.info("New frame %d", frame_number)
+
         # Get the JSON blob frame shared memory.
         json_str = self.shared_list[FROM_NAPARI].rstrip()
 
         try:
-            data = json.loads(json_str)
+            if json_str == self.last_json_str:
+                return  # nothing is now
 
-            # Process the new information from napari.
-            if self.napari_state.update(data):
-                if DUMP_DATA_FROM_NAPARI:
-                    self._log(f"New data from napari: {json_str}")
+            self.napari_data = json.loads(json_str)
+            self.napari_data_new = True
+            self.last_json_str = json_str
+
+            if DUMP_DATA_FROM_NAPARI:
+                pretty_str = json.dumps(self.napari_data, indent=4)
+                LOGGER.info("New data from napari: %s", pretty_str)
 
         except json.decoder.JSONDecodeError:
-            self._log(f"Could not parse data from napari: {json_str}")
+            LOGGER.error("Parsing data from napari: %s", json_str)
 
-    def set_params(self, params) -> None:
-        """Send new Web UI state to napari.
-
-        This is very ad hoc, we need a real queue or handshake or something.
-        For now we just throw it in and expect napari to read it out.
+    def post_command(self, command) -> None:
+        """Send new command to napari.
         """
-        if self.connected:
-            json_str = json.dumps(params)
-            self._log(f"Pass params to napari {json_str}")
-            self._log(f"Writing {len(json_str)} characters to TO_NAPARI")
-            self.shared_list[TO_NAPARI] = json_str
+        if not self.connected:
+            return
+
+        self._log(f"Posting command {command}")
+
+        try:
+            self._commands.put(command)
+        except ConnectionRefusedError:
+            self._log("ConnectionRefusedError")
 
     def stop(self) -> None:
-        """Call on shutdown. TODO_MON: no on calls this yet."""
-        self.manager.shutdown()
+        """Call on shutdown. TODO_MON: no one calls this yet?"""
+        self._manager.shutdown()
+
+    def _log_tiled_data(self, data) -> None:
+        LOGGER.info("data['num_created'] = %s", data['num_created'])
+        LOGGER.info("data['num_deleted'] = %s", data['num_deleted'])
+        LOGGER.info("data['duration_ms'] = %s", data['duration_ms'])
 
 
 def create_napari_client(client_name) -> MonitorClient:

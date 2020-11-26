@@ -16,13 +16,17 @@ SHOW_TILES = true;
 SHOW_VIEW = true;
 
 
-function setTileConfig(msg) {
-	newRows = parseInt(msg.shape_in_tiles[0]);
-	newCols = parseInt(msg.shape_in_tiles[1]);
+function setTileConfig(config) {
+
+	newRows = parseInt(config.shape_in_tiles[0]);
+	newCols = parseInt(config.shape_in_tiles[1]);
+
+	// Only create tiles if this is a new config, creating tiles
+	// is more expensive than just updating their colors.
 	if (tileConfig.rows != newRows || tileConfig.cols != newCols) {
 		tileConfig.rows = newRows;
 		tileConfig.cols = newCols;
-		tileConfig.baseShape = msg.base_shape;
+		tileConfig.baseShape = config.base_shape;
 
 		if (SHOW_TILES) {
 			createTiles();
@@ -30,11 +34,21 @@ function setTileConfig(msg) {
 	}
 }
 
-function setTileState(msg) {
-	tileState.seen = msg.seen;
-	tileState.normalized = msg.normalized;
-	tileState.corners = msg.corners;
-	updateTiles();
+function setTileState(state) {
+	tileState.seen = state.seen;
+	tileState.corners = state.corners;
+	if (SHOW_TILES) {
+		updateTiles();
+	}
+}
+
+//
+// webmon sent us a set_tile_data message
+//
+function setTileData(msg) {
+	console.log("setTileData", msg)
+	setTileConfig(msg.tile_config)
+	setTileState(msg.tile_state)
 }
 
 // References:
@@ -60,12 +74,8 @@ function connectSocketInput() {
 			console.log("data received", msg);
 		});
 
-		internalParams.socket.on('set_tile_config', function (msg) {
-			setTileConfig(msg);
-		});
-
-		internalParams.socket.on('set_tile_state', function (msg) {
-			setTileState(msg);
+		internalParams.socket.on('set_tile_data', function (msg) {
+			setTileData(msg);
 		});
 	});
 }
@@ -87,7 +97,6 @@ function removeFromScene(object) {
 
 function drawLine(start, end, color) {
 	const points = [];
-	console.log("start=", start);
 	points.push(new THREE.Vector2(...start));
 	points.push(new THREE.Vector2(...end));
 	var material = new THREE.LineBasicMaterial({
@@ -184,7 +193,7 @@ function createTiles() {
 
 	const tileSize = 1 / rows;
 
-	console.log("Create tiles", rows, cols);
+	console.log(`Create tiles ${rows} x ${cols}`);
 
 	// Add in order so that index = row * cols + col
 	for (row = 0; row < rows; row++) {
@@ -304,7 +313,7 @@ function createGUI() {
 // Send the from GUI back to Flask.
 //
 function sendGUIinfo() {
-
+	console.log("SEND GUI", externalParams);
 	internalParams.socket.emit('gui_input', externalParams);
 }
 

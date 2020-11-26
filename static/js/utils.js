@@ -11,14 +11,18 @@ var externalParams;
 function defineExternalParams() {
 	externalParams = new function () {
 		this.show_grid = false;
+		this.test_command = {
+			name: "fred",
+			values: [1, 2, 3, 4]
+		}
 	};
 }
 
 var tileConfig;
 function defineTileConfig() {
 	tileConfig = new function () {
-		this.rows = 5;
-		this.cols = 5;
+		this.rows = 0;
+		this.cols = 0;
 
 		// The full base image shape, might be huge like (100000, 100000).
 		this.baseShape = 0;
