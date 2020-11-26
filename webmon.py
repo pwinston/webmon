@@ -52,18 +52,21 @@ def background_thread() -> None:
     while True:
         socketio.sleep(poll_interval_seconds)
 
-        if updateParams and napari_client is not None:
+        if napari_client is None:
+            continue  # Still starting up?
+
+        if updateParams:
             # Post data from viewer to napari.
             napari_client.post_command(params)
 
         if napari_client.napari_data_new:
             # Set new napari data to viewer
             data = napari_client.napari_data
-            napari_client.napari_data_new = False
             LOGGER.info("Emit set_tile_data")
             socketio.emit('set_tile_data', data, namespace='/test')
 
         updateParams = False
+        napari_client.napari_data_new = False
 
 
 # Testing the connection.
@@ -138,6 +141,12 @@ def main(log_path: str) -> None:
 
     global napari_client
     napari_client = create_napari_client("webmon")
+
+    if napari_client is None:
+        print("ERROR: no napari_client was created")
+        return
+
+    # Start it up
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
 
 

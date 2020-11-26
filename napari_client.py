@@ -2,20 +2,16 @@
 
 This client connects to napari's shared memory monitor.
 """
-from dataclasses import dataclass
-import logging
-import time
-import os
-import json
-import sys
-from multiprocessing.managers import (
-    SharedMemoryManager,
-    Server,
-    SharedMemoryServer,
-)
-from multiprocessing.shared_memory import ShareableList
 import base64
+import json
+import os
+import logging
+from multiprocessing.managers import SharedMemoryManager
+from multiprocessing.shared_memory import ShareableList
+import sys
+import time
 from threading import Thread
+from typing import Optional
 
 LOGGER = logging.getLogger("webmon")
 
@@ -26,7 +22,7 @@ FROM_NAPARI = 1
 
 BUFFER_SIZE = 1024 * 1024
 
-DUMP_DATA_FROM_NAPARI = True
+DUMP_DATA_FROM_NAPARI = False
 
 
 def _get_client_config() -> dict:
@@ -48,10 +44,6 @@ def _get_client_config() -> dict:
     return json.loads(config_str)
 
 
-def _get_data(shared_list):
-    """Get the JSON blob from napari's shared memory."""
-
-
 class MonitorClient(Thread):
     """Client for napari shared memory monitor.
 
@@ -69,6 +61,7 @@ class MonitorClient(Thread):
 
     def __init__(self, config: dict, client_name="?"):
         super().__init__()
+        assert config
         self.config = config
         self.client_name = client_name
 
@@ -79,6 +72,10 @@ class MonitorClient(Thread):
         server_port = config['server_port']
         LOGGER.info("Connecting to port %d...", server_port)
 
+        # These are callbacks napari provides. We could get a list of callbacks
+        # from the config. But we can do anything with them unless we modify
+        # our source anyway, so does it matter this is manual?
+        SharedMemoryManager.register('shutdown_event')
         SharedMemoryManager.register('command_queue')
 
         self._manager = SharedMemoryManager(
@@ -86,6 +83,9 @@ class MonitorClient(Thread):
             authkey=str.encode('napari'),
         )
         self._manager.connect()
+
+        # Get the shared resources.
+        self._shutdown = self._manager.shutdown_event()
         self._commands = self._manager.command_queue()
 
         # We update this with the last frame we've received from napari.
@@ -95,39 +95,45 @@ class MonitorClient(Thread):
         # compare the new and old strings.
         self.last_json_str = None
 
-        if self.config is not None:
-            # Connect to the shared resources, just one list right now.
-            list_name = config['shared_list_name']
-            LOGGER.info("Connecting to shared list %s", list_name)
-            self.shared_list = ShareableList(name=list_name)
-            LOGGER.info("Connected to shared list %s", list_name)
-
-        # TODO_MON: We need to check if we really connected to napri's
-        # share memory or not. Surely there could be errors.
-        self.connected = self.config is not None
+        # Connect to the shared resources, just one list right now.
+        list_name = config['shared_list_name']
+        LOGGER.info("Connecting to shared list %s", list_name)
+        self.shared_list = ShareableList(name=list_name)
 
         # Start our thread so we can poll napari.
         self.start()
 
     def run(self) -> None:
-        """Periodically check shared memory for new data."""
+        """Check shared memory for new data."""
 
-        LOGGER.info(f"Running...")
+        LOGGER.info("MonitorClient thread is running...")
+
         while True:
-            # Only poll if we are connected, but keep the thread
-            # alive either way. Might be useful for debugging.
-            if self.connected:
-                self._poll()
+            if not self._poll():
+                LOGGER.info("Exiting...")
+                break
 
-            # TBD what is a good poll interval. But realize we are
-            # just checking a single integer in shared memory
-            # each time. So not much effor.t
+            # TBD what is a good poll interval is.
             time.sleep(0.01)
 
-    def _poll(self) -> None:
+        # Hard exiting is bad, but it does not sound easy to gracefully
+        # exit a Flask-SocketIO server. If this is messing up the viewer
+        # we'll need to do better.
+        sys.exit(0)
+
+    def _poll(self) -> bool:
         """See if there is now information in shared mem."""
 
         # LOGGER.info("Poll...")
+        try:
+            if self._shutdown.is_set():
+                # We sometimes do see the shutdown event was set. But usually
+                # we just get ConnectionResetError, because napari is exiting.
+                LOGGER.info("Shutdown event was set.")
+                return False  # Stop polling
+        except ConnectionResetError:
+            LOGGER.info("ConnectionResetError.")
+            return False  # Stop polling
 
         # Check napari's current frame.
         frame_number = self.shared_list[FRAME_NUMBER]
@@ -135,11 +141,13 @@ class MonitorClient(Thread):
         # If we already processed this frame, bail out.
         if frame_number == self.frame_number:
             # LOGGER.info("Same frame %d", self.frame_number)
-            return
+            return True  # Keep polling
 
         # Process this new frame.
         self._on_new_frame(frame_number)
         self.frame_number = frame_number
+
+        return True  # Keep polling
 
     def _on_new_frame(self, frame_number) -> None:
         """There is a new frame, grab the latest JSON blob."""
@@ -186,10 +194,9 @@ class MonitorClient(Thread):
         LOGGER.info("data['duration_ms'] = %s", data['duration_ms'])
 
 
-def create_napari_client(client_name) -> MonitorClient:
+def create_napari_client(client_name) -> Optional[MonitorClient]:
     """Napari monitor client."""
-    # The config will be None if not launch from napari. But still
-    # start some client to do some limitted tested. Some day we could
-    # have fake-napari thread updating us for better testing.
     config = _get_client_config()
+    if config is None:
+        return None
     return MonitorClient(config, client_name)
