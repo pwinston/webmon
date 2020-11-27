@@ -5,6 +5,20 @@
 //
 // Modified from https://github.com/ageller/FlaskTest
 //
+import * as THREE from 'three';
+import { GUI } from 'dat.gui';
+
+import {
+	externalParams,
+	defineExternalParams,
+	tileConfig,
+	defineTileConfig,
+	tileState,
+	defineTileState,
+	internalParams,
+	defineInternalParams,
+	initScene,
+} from './utils.js';
 
 // Draw the axes (red=X green=Y).
 SHOW_AXES = true;
@@ -56,7 +70,7 @@ function setTileData(msg) {
 // https://blog.miguelgrinberg.com/post/easy-websockets-with-flask-and-gevent
 // https://github.com/miguelgrinberg/Flask-SocketIO
 //
-function connectSocketInput() {
+export function connectSocketInput() {
 
 	document.addEventListener("DOMContentLoaded", function (event) {
 
@@ -305,7 +319,7 @@ function createViewer() {
 // Create the GUI.
 //
 function createGUI() {
-	internalParams.gui = new dat.GUI();
+	internalParams.gui = new GUI();
 	internalParams.gui.add(externalParams, 'show_grid').onChange(sendGUIinfo);
 }
 
@@ -329,7 +343,7 @@ function animateViewer(time) {
 //
 // Called on startup.
 //
-function startViewer() {
+export function startViewer() {
 	console.log("startViewer")
 
 	defineInternalParams();
