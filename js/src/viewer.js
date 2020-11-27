@@ -32,8 +32,8 @@ const SHOW_VIEW = true;
 
 function setTileConfig(config) {
 
-	newRows = parseInt(config.shape_in_tiles[0]);
-	newCols = parseInt(config.shape_in_tiles[1]);
+	const newRows = parseInt(config.shape_in_tiles[0]);
+	const newCols = parseInt(config.shape_in_tiles[1]);
 
 	// Only create tiles if this is a new config, creating tiles
 	// is more expensive than just updating their colors.
@@ -266,10 +266,10 @@ function updateTileColors() {
 	console.log("Drawing ", seenMap.size);
 
 	// Set the colors of all the tiles.
-	for (row = 0; row < rows; row++) {
-		for (col = 0; col < cols; col++) {
+	for (let row = 0; row < rows; row++) {
+		for (let col = 0; col < cols; col++) {
 			const index = row * cols + col;
-			color = seenMap.has(index) ? COLOR_TILE_ON : COLOR_TILE_OFF;
+			const color = seenMap.has(index) ? COLOR_TILE_ON : COLOR_TILE_OFF;
 			tileState.tiles[index].material.color.set(color);
 		}
 	}
