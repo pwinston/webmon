@@ -21,13 +21,13 @@ import {
 } from './utils.js';
 
 // Draw the axes (red=X green=Y).
-SHOW_AXES = true;
+const SHOW_AXES = true;
 
 // Draw the tiles themselves.
-SHOW_TILES = true;
+const SHOW_TILES = true;
 
 // Draw the rect depicting Napari's current view frustum.
-SHOW_VIEW = true;
+const SHOW_VIEW = true;
 
 
 function setTileConfig(config) {
@@ -95,11 +95,11 @@ export function connectSocketInput() {
 }
 
 // Tile colors
-COLOR_TILE_OFF = 0xa3a2a0; // gray
-COLOR_TILE_ON = 0xE11313;  // red
-COLOR_VIEW = 0xF5C542; // yellow
+const COLOR_TILE_OFF = 0xa3a2a0; // gray
+const COLOR_TILE_ON = 0xE11313;  // red
+const COLOR_VIEW = 0xF5C542; // yellow
 
-TILE_GAP = 0.1; // fraction of the tile size
+const TILE_GAP = 0.1; // fraction of the tile size
 
 function addToScene(object) {
 	internalParams.group.add(object);
@@ -124,9 +124,9 @@ function drawLine(start, end, color) {
 
 function createAxes() {
 	const depth = -1;
-	origin = [0, 0, depth];
-	y_axes = [0, 1, depth];
-	x_axes = [1, 0, depth];
+	const origin = [0, 0, depth];
+	const y_axes = [0, 1, depth];
+	const x_axes = [1, 0, depth];
 	drawLine(origin, x_axes, 0xFF0000);
 	drawLine(origin, y_axes, 0x00FF00);
 }
@@ -210,8 +210,8 @@ function createTiles() {
 	console.log(`Create tiles ${rows} x ${cols}`);
 
 	// Add in order so that index = row * cols + col
-	for (row = 0; row < rows; row++) {
-		for (col = 0; col < cols; col++) {
+	for (let row = 0; row < rows; row++) {
+		for (let col = 0; col < cols; col++) {
 			const tile = createTile(row, col, tileSize)
 			tileState.tiles.push(tile);
 		}

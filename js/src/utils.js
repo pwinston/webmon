@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls';
 import io from 'socket.io-client';
 
-ZOOM = 0.8;
+const ZOOM = 0.8;
 
 export var externalParams;
 export function defineExternalParams() {
@@ -135,8 +135,9 @@ export function initScene() {
 
 	// events
 	const onWindowResize = () => {
+		// https://github.com/mrdoob/three.js/issues/69
 		internalParams.camera.aspect = window.innerWidth / window.innerHeight;
-		internalParams.cambera.updateProjectionMatrix();
+		internalParams.camera.updateProjectionMatrix();
 		internalParams.renderer.setSize(window.innerWidth, window.innerHeight);
 	}
 	window.addEventListener('resize', onWindowResize, false);
