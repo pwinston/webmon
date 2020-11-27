@@ -17,7 +17,7 @@ SHOW_VIEW = true;
 
 
 function setTileConfig(config) {
-
+	console.log("setTileConfg", config)
 	newRows = parseInt(config.shape_in_tiles[0]);
 	newCols = parseInt(config.shape_in_tiles[1]);
 

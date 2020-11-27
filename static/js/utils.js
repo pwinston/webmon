@@ -11,10 +11,6 @@ var externalParams;
 function defineExternalParams() {
 	externalParams = new function () {
 		this.show_grid = false;
-		this.test_command = {
-			name: "fred",
-			values: [1, 2, 3, 4]
-		}
 	};
 }
 

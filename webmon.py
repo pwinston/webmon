@@ -13,17 +13,43 @@ import logging
 from threading import Lock
 from pathlib import Path
 
+import numpy as np
 import click
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, session
 from flask_socketio import SocketIO, emit
 
 from napari_client import create_napari_client
 
 LOGGER = logging.getLogger("webmon")
 
-app = Flask(__name__)
-
 client = None
+
+
+class NumpyJSONEncoder(json.JSONEncoder):
+    """A JSONEncoder that also converts ndarray's to lists.
+
+    We might want to also derive from flask.jsonJSONEncoder which supports
+    "datetime, UUID, dataclasses and Markup objects"?
+    """
+
+    def default(self, o):
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        return json.JSONEncoder.default(self, o)
+
+
+class NumpyJSON:
+    """So SocketIO can encode numpy arrays for us."""
+
+    @staticmethod
+    def dumps(obj, *args, **kwargs):
+        kwargs.update({"cls": NumpyJSONEncoder})
+        return json.dumps(obj, *args, **kwargs)
+
+    @staticmethod
+    def loads(obj, *args, **kwargs):
+        return json.loads(obj, *args, **kwargs)
+
 
 # Set this variable to "threading", "eventlet" or "gevent" to test the
 # different async modes, or leave it set to None for the application to choose
@@ -32,7 +58,8 @@ async_mode = None
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, async_mode=async_mode)
+
+socketio = SocketIO(app, async_mode=async_mode, json=NumpyJSON)
 thread = None
 thread_lock = Lock()
 
@@ -45,29 +72,61 @@ poll_interval_seconds = 0.01
 
 last_frame_number = None
 
+# Hack way to avoid spamming the viewer with duplicate data.
+last_json_str = ""
+
+
+def numpy_dumps(data: dict) -> str:
+    """Return data as a JSON string.
+
+    Under the hood socketio.emit() will serialize to JSON and it will choke
+    on numpy data, so we convert to JSON ourselves ahead of time.
+
+    Return
+    ------
+    str
+        The JSON string.
+    """
+    return json.dumps(data, cls=NumpyJSONEncoder)
+
 
 def background_thread() -> None:
     """Send data to/from the viewer and napari."""
-    global params, updateParams
+    global params, updateParams, last_json_str
     while True:
         socketio.sleep(poll_interval_seconds)
 
         if client is None:
+            LOGGER.info("Client is None, keep trying.")
             continue  # Still starting up?
+
+        if not client.running:
+            LOGGER.info("Client is no longer running, exiting")
+            socketio.stop()  # Does not work?
+            return
 
         if updateParams:
             # Post data from viewer to napari.
+            LOGGER.info("Post command to napari: %s", params)
             client.post_command(params)
+        updateParams = False
 
-        if client.napari_data_new:
-            # Set new napari data to viewer
-            data = client.napari_data
-            data_len = len(client.last_json_str)
+        # Set new napari data to viewer
+        data = client.napari_data
+        json_str = numpy_dumps(data)
+        if json_str != last_json_str:
+            data_len = len(json_str)
+            LOGGER.info(json_str)
             LOGGER.info("Emit set_tile_data: %d chars", data_len)
             socketio.emit('set_tile_data', data, namespace='/test')
+            last_json_str = json_str
+        else:
+            LOGGER.info("no change")
 
-        updateParams = False
-        client.napari_data_new = False
+
+@socketio.on_error_default
+def default_error_handler(e):
+    LOGGER.error(e)
 
 
 # Testing the connection.
@@ -99,9 +158,11 @@ def gui_input(message):
 # Background task, sends data to viewers.
 @socketio.on('connect', namespace='/test')
 def from_gui():
+    LOGGER.info("connect")
     global thread
     with thread_lock:
         if thread is None:
+            LOGGER.info("Create thread")
             thread = socketio.start_background_task(target=background_thread)
 
 
@@ -144,7 +205,7 @@ def main(log_path: str) -> None:
     client = create_napari_client("webmon")
 
     if client is None:
-        print("ERROR: no napari client was created")
+        print("ERROR: MonitorClient not created.")
         return
 
     # Start it up
