@@ -5,17 +5,21 @@
 
 // We define or ortho camera to view the space [0..1], but then we zoom
 // a bit so that area has a border around it.
-ZOOM = 0.8;
+import * as THREE from 'three';
+import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls';
+import io from 'socket.io-client';
 
-var externalParams;
-function defineExternalParams() {
+const ZOOM = 0.8;
+
+export var externalParams;
+export function defineExternalParams() {
 	externalParams = new function () {
 		this.show_grid = false;
 	};
 }
 
-var tileConfig;
-function defineTileConfig() {
+export var tileConfig;
+export function defineTileConfig() {
 	tileConfig = new function () {
 		this.rows = 0;
 		this.cols = 0;
@@ -25,8 +29,8 @@ function defineTileConfig() {
 	};
 }
 
-var tileState;
-function defineTileState() {
+export var tileState;
+export function defineTileState() {
 	tileState = new function () {
 		this.seen = [];
 		this.corners = [[0, 0], [1, 1]];
@@ -36,8 +40,8 @@ function defineTileState() {
 	};
 }
 
-var internalParams;
-function defineInternalParams() {
+export var internalParams;
+export function defineInternalParams() {
 	internalParams = new function () {
 
 		this.container = null;
@@ -71,7 +75,7 @@ function defineInternalParams() {
 }
 
 //https://html-online.com/articles/get-url-parameters-javascript/
-function getURLvars() {
+export function getURLvars() {
 	var vars = {};
 	var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (m, key, value) {
 		vars[key] = value;
@@ -79,7 +83,7 @@ function getURLvars() {
 	return vars;
 }
 
-function setParamsFromURL() {
+export function setParamsFromURL() {
 	var vars = getURLvars();
 	var keys = Object.keys(vars);
 	keys.forEach(function (k) {
@@ -88,7 +92,7 @@ function setParamsFromURL() {
 }
 
 //this initializes everything needed for the scene
-function initScene() {
+export function initScene() {
 
 	const screenWidth = window.innerWidth;
 	const screenHeight = window.innerHeight;
@@ -126,13 +130,19 @@ function initScene() {
 	internalParams.camera = camera
 
 	// events
-	THREEx.WindowResize(internalParams.renderer, internalParams.camera);
+	const onWindowResize = () => {
+		// https://github.com/mrdoob/three.js/issues/69
+		internalParams.camera.aspect = window.innerWidth / window.innerHeight;
+		internalParams.camera.updateProjectionMatrix();
+		internalParams.renderer.setSize(window.innerWidth, window.innerHeight);
+	}
+	window.addEventListener('resize', onWindowResize, false);
 
 	//controls
-	internalParams.controls = new THREE.TrackballControls(internalParams.camera, internalParams.renderer.domElement);
+	internalParams.controls = new TrackballControls(internalParams.camera, internalParams.renderer.domElement);
 }
 
-function setURLvars() {
+export function setURLvars() {
 	var keys = Object.keys(externalParams);
 	var vars = "/gui?" //this needs to be the same as what is in flask
 	keys.forEach(function (k) {
@@ -142,5 +152,3 @@ function setURLvars() {
 	});
 	window.history.pushState("externalParams", "updated", vars);
 }
-
-
