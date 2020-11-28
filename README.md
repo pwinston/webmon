@@ -2,9 +2,13 @@
 
 See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details about this repo.
 
-# Installation
+# Python Requirements
 
 * pip3 install -r requirements.txt
+
+# Build
+
+* `make build`
 
 **webmon** is three things combined:
 1. Experimental napari shared memory monitor client.
