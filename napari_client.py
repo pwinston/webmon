@@ -129,10 +129,11 @@ class MonitorClient(Thread):
 
         while True:
             if not self._poll():
-                LOGGER.info("Exiting...")
                 break
 
             time.sleep(POLL_INTERVAL_MS / 1000)
+
+        LOGGER.info("Exiting thread...")
 
         # webmon checks this and stops/exits.
         self.running = False

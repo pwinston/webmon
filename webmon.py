@@ -114,14 +114,14 @@ def background_thread() -> None:
         # Set new napari data to viewer
         data = client.napari_data
         json_str = numpy_dumps(data)
-        if json_str != last_json_str:
-            data_len = len(json_str)
-            LOGGER.info(json_str)
-            LOGGER.info("Emit set_tile_data: %d chars", data_len)
-            socketio.emit('set_tile_data', data, namespace='/test')
-            last_json_str = json_str
-        else:
-            LOGGER.info("no change")
+        if json_str == last_json_str:
+            continue  # Nothing new.
+
+        data_len = len(json_str)
+        LOGGER.info(json_str)
+        LOGGER.info("Emit set_tile_data: %d chars", data_len)
+        socketio.emit('set_tile_data', data, namespace='/test')
+        last_json_str = json_str
 
 
 @socketio.on_error_default
@@ -211,6 +211,10 @@ def main(log_path: str) -> None:
     # Start it up
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
 
+    # When done...
+    LOGGER.info("Exiting process...")
+
 
 if __name__ == "__main__":
     main()
+
