@@ -7,14 +7,14 @@ sees new information we push it out to any connected web browsers.
 
 Modified from https://github.com/ageller/FlaskTest
 """
-import os
 import json
 import logging
-from threading import Lock
+import os
 from pathlib import Path
+from threading import Lock
 
-import numpy as np
 import click
+import numpy as np
 from flask import Flask, render_template, session
 from flask_socketio import SocketIO, emit
 
@@ -101,7 +101,7 @@ def background_thread() -> None:
             continue  # Still starting up?
 
         if not client.running:
-            LOGGER.info("Client is no longer running, exiting")
+            LOGGER.info("Client not running, exiting background thread.")
             socketio.stop()  # Does not work?
             return
 
@@ -212,9 +212,8 @@ def main(log_path: str) -> None:
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
 
     # When done...
-    LOGGER.info("Exiting process...")
+    LOGGER.info("Exiting process %s...", os.getpid())
 
 
 if __name__ == "__main__":
     main()
-

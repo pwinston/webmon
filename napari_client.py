@@ -4,16 +4,16 @@ A shared memory client for napari.
 
 This client connects to napari's shared memory monitor.
 """
-from typing import NamedTuple, Optional
 import base64
 import json
-import os
 import logging
-from threading import Event, Thread
-from queue import Queue
-from multiprocessing.managers import SharedMemoryManager
+import os
+import threading
 import time
-
+from multiprocessing.managers import SharedMemoryManager
+from queue import Queue
+from threading import Event, Thread
+from typing import NamedTuple, Optional
 
 LOGGER = logging.getLogger("webmon")
 
@@ -93,11 +93,12 @@ class MonitorClient(Thread):
         self.running = True
         self.napari_data = None
 
-        LOGGER.info("Starting MonitorClient process %s", os.getpid())
+        pid = os.getpid()
+        LOGGER.info("Starting MonitorClient process %s", pid)
         _log_env()
 
         server_port = config['server_port']
-        LOGGER.info("Connecting to port %d...", server_port)
+        LOGGER.info("Process %s connecting to port %d...", pid, server_port)
 
         # Right now we just need to magically know these callback names,
         # maybe we can come up with a better way.
@@ -125,18 +126,21 @@ class MonitorClient(Thread):
     def run(self) -> None:
         """Check shared memory for new data."""
 
-        LOGGER.info("MonitorClient thread is running...")
+        tid = threading.get_ident()
+        LOGGER.info("MonitorClient thread %d started...", tid)
+
+        poll_interval_seconds = POLL_INTERVAL_MS / 1000
 
         while True:
             if not self._poll():
                 break
 
-            time.sleep(POLL_INTERVAL_MS / 1000)
-
-        LOGGER.info("Exiting thread...")
+            time.sleep(poll_interval_seconds)
 
         # webmon checks this and stops/exits.
         self.running = False
+
+        LOGGER.info("MonitorClient exiting thread...")
 
     def _poll(self) -> bool:
         """See if there is now information in shared mem."""
