@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "esbuild --minify --splitting --bundle --format=esm --outdir=../static src/viewer.js"
+    "build": "node build"
   },
   "devDependencies": {
     "esbuild": "^0.8.16"
