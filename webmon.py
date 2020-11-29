@@ -87,8 +87,7 @@ def background_thread() -> None:
         socketio.sleep(poll_interval_seconds)
 
         if client is None:
-            LOGGER.info("Client is None, keep trying.")
-            continue  # Still starting up?
+            continue
 
         if updateParams:
             # Post data from viewer to napari.
