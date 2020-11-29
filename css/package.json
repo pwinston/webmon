@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "build": "NODE_ENV=production npm run build:dev",
+    "build:dev": "tailwindcss-cli build styles.css -o ../static/styles.css"
+  },
+  "dependencies": {
+    "tailwindcss-cli": "^0.1.2"
+  }
+}

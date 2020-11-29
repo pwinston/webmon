@@ -1,4 +1,6 @@
 __pycache__/
 .DS_store
 node_modules/
-bundle.js
+
+static/**/*.js
+static/styles.css
