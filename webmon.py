@@ -171,6 +171,10 @@ def from_gui():
 def viewer():
     return render_template("viewer.html")
 
+@app.route("/blank")
+def blank():
+    return render_template("blank.html")
+
 
 def _log_to_file(path: str) -> None:
     """Log "napari.async" messages to the given file.
