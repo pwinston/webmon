@@ -1,18 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
+{% block content %}
+<div id="WebGLContainer"></div>
 
-<head>
-	<meta charset="utf-8">
-	<title>Napari Monitor</title>
-</head>
-
-<body style="margin:0; padding:0; overflow:hidden">
-
-
-	<!-- This will contain the canvas -->
-	<div id="WebGLContainer"></div>
-
-	<script src="/static/bundle.js"></script>
-</body>
-
-</html>
+<script type="module">
+	import { startViewer, connectSocketInput } from '/static/viewer.js';
+	startViewer();
+	connectSocketInput();
+</script>
+{% endblock %}
