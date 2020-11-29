@@ -208,6 +208,12 @@ def _log_to_file(path: str) -> None:
     LOGGER.info("Writing log to %s", path)
 
 
+def _log_to_console() -> None:
+    """Log to console."""
+    logging.basicConfig(level=logging.DEBUG)
+    LOGGER.info("Logging to console.")
+
+
 def _create_napari_client(port: int):
     """Create and return the NapariClient.
 
@@ -255,6 +261,8 @@ def main(log_path: Optional[str], port: int) -> None:
     """
     if log_path is not None:
         _log_to_file(log_path)
+    else:
+        _log_to_console()
 
     LOGGER.info("Webmon: Starting process %d", os.getpid())
     LOGGER.info("Webmon: args %s", sys.argv)
