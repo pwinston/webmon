@@ -2,64 +2,65 @@
 
 Proof of concept napari monitor client and Flask-SocketIO web server.
 
-We start up MonitorClient to monitor napari's shared memory. When it
-sees new information we push it out to any connected web browsers.
+Current repo:
+https://github.com/pwinston/webmon
 
-Modified from https://github.com/ageller/FlaskTest
+1) Start socketio web server, default localhost:5000.
+2) Start NapariClient which connects to napari via shared memory.
+
+History
+-------
+Originally based on:
+https://github.com/ageller/FlaskTest
 """
 import json
 import logging
 import os
+import sys
 from pathlib import Path
-from threading import Lock
+from threading import Lock, get_ident
+from typing import Optional
 
 import click
-import numpy as np
+import requests
 from flask import Flask, render_template, session
 from flask_socketio import SocketIO, emit
 
-from napari_client import create_napari_client
+from lib.numpy_json import NumpyJSON
+from napari_client import NapariClient
 
 LOGGER = logging.getLogger("webmon")
 
+# Create the NapariClient which connects to napari. Without the client our
+# Flask-SocketIO server has nothing to serve, but maybe useful as a test.
+CREATE_CLIENT = True
+
+# The reloader creates a 2nd process that watches the source files for
+# changes. However from the logs it looked like this 2nd process was doing
+# all the same things as the first process, creating connections, etc. And
+# it was causing both processes to hang on exit.
+#
+# Perhaps if we got rid of globals or otherwise made it safe to
+# run a 2nd process, we could turn this back on.
+USE_RELOADER = False
+
+# If true we delete the previous log file on startup. There are pros and
+# cons to deleting it depending on how you are monitoring it.
+DELETE_LOG_FILE = False
+
+# The NapariClient
 client = None
-
-
-class NumpyJSONEncoder(json.JSONEncoder):
-    """A JSONEncoder that also converts ndarray's to lists.
-
-    We might want to also derive from flask.jsonJSONEncoder which supports
-    "datetime, UUID, dataclasses and Markup objects"?
-    """
-
-    def default(self, o):
-        if isinstance(o, np.ndarray):
-            return o.tolist()
-        return json.JSONEncoder.default(self, o)
-
-
-class NumpyJSON:
-    """So SocketIO can encode numpy arrays for us."""
-
-    @staticmethod
-    def dumps(obj, *args, **kwargs):
-        kwargs.update({"cls": NumpyJSONEncoder})
-        return json.dumps(obj, *args, **kwargs)
-
-    @staticmethod
-    def loads(obj, *args, **kwargs):
-        return json.loads(obj, *args, **kwargs)
-
-
-# Set this variable to "threading", "eventlet" or "gevent" to test the
-# different async modes, or leave it set to None for the application to choose
-# the best option based on installed packages.
-async_mode = None
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
+# Specifiy gevent. Has some trouble with eventlet although could try it again.
+# If this is none then SocketIO will select a transport, but I'd rather
+# specify it so everyone is using the same one, if it works.
+async_mode = "eventlet"
+
 socketio = SocketIO(app, async_mode=async_mode, json=NumpyJSON)
+
 thread = None
 thread_lock = Lock()
 
@@ -76,34 +77,18 @@ last_frame_number = None
 last_json_str = ""
 
 
-def numpy_dumps(data: dict) -> str:
-    """Return data as a JSON string.
-
-    Under the hood socketio.emit() will serialize to JSON and it will choke
-    on numpy data, so we convert to JSON ourselves ahead of time.
-
-    Return
-    ------
-    str
-        The JSON string.
-    """
-    return json.dumps(data, cls=NumpyJSONEncoder)
-
-
 def background_thread() -> None:
     """Send data to/from the viewer and napari."""
     global params, updateParams, last_json_str
+    tid = get_ident()
+    LOGGER.info("Webmon: background thread tid=%d", tid)
+
     while True:
         socketio.sleep(poll_interval_seconds)
 
         if client is None:
             LOGGER.info("Client is None, keep trying.")
             continue  # Still starting up?
-
-        if not client.running:
-            LOGGER.info("Client not running, exiting background thread.")
-            socketio.stop()  # Does not work?
-            return
 
         if updateParams:
             # Post data from viewer to napari.
@@ -113,8 +98,9 @@ def background_thread() -> None:
 
         # Set new napari data to viewer
         data = client.napari_data
-        json_str = numpy_dumps(data)
+        json_str = NumpyJSON.dumps(data)
         if json_str == last_json_str:
+            LOGGER.info("nothing new")
             continue  # Nothing new.
 
         data_len = len(json_str)
@@ -132,6 +118,7 @@ def default_error_handler(e):
 # Testing the connection.
 @socketio.on('connection_test', namespace='/test')
 def connection_test(message):
+    LOGGER.info("connection_test: %s", message)
     session['receive_count'] = session.get('receive_count', 0) + 1
     emit(
         'connection_response',
@@ -147,7 +134,7 @@ def input_data_request(message):
     emit('input_data_response', json.dumps(data))
 
 
-# Receive data from viewers.
+# Receive data from viewer.
 @socketio.on('gui_input', namespace='/test')
 def gui_input(message):
     global params, updateParams
@@ -155,21 +142,53 @@ def gui_input(message):
     params = message
 
 
-# Background task, sends data to viewers.
+# Background task, send/receive data to viewers.
 @socketio.on('connect', namespace='/test')
 def from_gui():
     LOGGER.info("connect")
     global thread
+
     with thread_lock:
         if thread is None:
-            LOGGER.info("Create thread")
+            # Only create one background task for all viewers.
+            LOGGER.info("Webmon: Creating background thread...")
             thread = socketio.start_background_task(target=background_thread)
 
 
-# We just have one page, but could have many.
+# Our only page.
 @app.route("/viewer")
 def viewer():
     return render_template("viewer.html")
+
+
+@app.route("/stop")
+def stop():
+    """Stop the socketio server.
+
+    The documentation says socketio.stop() "must be called from a HTTP or
+    SocketIO handler function". So our on_shutudown() function hits this
+    endpoint to stop socketio.
+
+    Once socketio is stopped the socketio.run() call in main will return
+    and the process will exit.
+    """
+    LOGGER.info("/stop -> stopping socketio.")
+    socketio.stop()
+    return "<h1>Stop</h1>Stopped socketio."
+
+
+def _delete_old_log(path: str) -> None:
+    """Delete the previous log file.
+
+    Parameters
+    ----------
+    path : str
+        The log file to delete.
+    """
+    try:
+        Path(path).unlink()
+    except FileNotFoundError:
+        pass  # It didn't exist.
 
 
 def _log_to_file(path: str) -> None:
@@ -180,11 +199,8 @@ def _log_to_file(path: str) -> None:
     path : str
         Log to this file path.
     """
-    try:
-        # Nuke/reset log for now.
-        Path(path).unlink()
-    except FileNotFoundError:
-        pass  # It didn't exist yet.
+    if DELETE_LOG_FILE:
+        _delete_old_log(path)
 
     fh = logging.FileHandler(path)
     LOGGER.addHandler(fh)
@@ -192,27 +208,67 @@ def _log_to_file(path: str) -> None:
     LOGGER.info("Writing log to %s", path)
 
 
+def _create_napari_client(port: int):
+    """Create and return the NapariClient.
+
+    Parameters
+    ----------
+    port : int
+        The port number of the web server.
+    """
+
+    def on_shutdown() -> None:
+        """Shutdown the web server.
+
+        This is called when NapariClient is shutting down. It shuts down
+        when it detects the napari it was connected to shuts down. So
+        we call our /stop endpoint to shutdown socketio.
+        """
+        stop_url = f"http://localhost:{port}/stop"
+        try:
+            requests.get(stop_url)
+        except requests.exceptions.ConnectionError:
+            LOGGER.error("Webmon: requests.exceptions.ConnectionError")
+
+    if not CREATE_CLIENT:
+        return None
+
+    client = NapariClient.create(on_shutdown)
+
+    if client is None:
+        LOGGER.error("NapariClient not created.")
+
+    return client
+
+
 @click.command()
 @click.option('--log_path', default=None, help="Path to write the log file")
-def main(log_path: str) -> None:
-    """Start webmon and the napari MonitorClient."""
+@click.option('--port', default=5000, help="Port for HTTP server")
+def main(log_path: Optional[str], port: int) -> None:
+    """Start webmon and the NapariClient.
+
+    Parameters
+    log_path : Optional[str]
+        If defined write the log to this path.
+    port : int
+        Serve HTTP at this port.
+    """
     if log_path is not None:
         _log_to_file(log_path)
 
     LOGGER.info("Webmon: Starting process %d", os.getpid())
+    LOGGER.info("Webmon: args %s", sys.argv)
+    LOGGER.info("Webmon: Serving http://localhost:%d/ ", port)
 
     global client
-    client = create_napari_client("webmon")
+    client = _create_napari_client(port)
 
-    if client is None:
-        print("ERROR: MonitorClient not created.")
-        return
+    # socketio.run does not exit until our /stop endpoint is hit.
+    socketio.run(
+        app, debug=True, host='0.0.0.0', port=port, use_reloader=USE_RELOADER
+    )
 
-    # Start it up
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
-
-    # When done...
-    LOGGER.info("Exiting process %s...", os.getpid())
+    LOGGER.info("Webmon: exiting process %s...", os.getpid())
 
 
 if __name__ == "__main__":
