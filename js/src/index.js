@@ -1,4 +1,3 @@
-import { startViewer, connectSocketInput } from './viewer.js';
+import { startViewer } from './viewer.js';
 
 startViewer();
-connectSocketInput();
