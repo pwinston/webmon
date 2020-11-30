@@ -102,7 +102,6 @@ def background_thread() -> None:
         data = client.napari_data
         json_str = NumpyJSON.dumps(data)
         if json_str == last_json_str:
-            LOGGER.info("nothing new")
             continue  # Nothing new.
 
         data_len = len(json_str)
@@ -161,6 +160,7 @@ def from_gui():
 @app.route("/viewer")
 def viewer():
     return render_template("viewer.html")
+
 
 @app.route("/blank")
 def blank():
