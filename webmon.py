@@ -26,6 +26,7 @@ from flask_socketio import SocketIO
 
 from bridge import NapariBridge
 from handlers import WebmonHandlers
+from lib.logging import setup_logging
 from lib.numpy_json import NumpyJSON
 from napari_client import NapariClient
 
@@ -43,10 +44,6 @@ CREATE_CLIENT = True
 # Perhaps if we got rid of globals or otherwise made it safe to
 # run a 2nd process, we could turn this back on.
 USE_RELOADER = False
-
-# If true we delete the previous log file on startup. There are pros and
-# cons to deleting it depending on how you are monitoring it.
-DELETE_LOG_FILE = False
 
 # Flask.
 app = Flask(__name__)
@@ -103,32 +100,6 @@ def stop():
     return "<h1>Stop</h1>Stopped socketio."
 
 
-def _log_to_file(path: str) -> None:
-    """Log "napari.async" messages to the given file.
-
-    Parameters
-    ----------
-    path : str
-        Log to this file path.
-    """
-    if DELETE_LOG_FILE:
-        try:
-            Path(path).unlink()
-        except FileNotFoundError:
-            pass  # It didn't exist.
-
-    fh = logging.FileHandler(path)
-    LOGGER.addHandler(fh)
-    LOGGER.setLevel(logging.DEBUG)
-    LOGGER.info("Writing log to %s", path)
-
-
-def _log_to_console() -> None:
-    """Log to console."""
-    logging.basicConfig(level=logging.DEBUG)
-    LOGGER.info("Logging to console.")
-
-
 def _notify_stop(port: int) -> None:
     """Shutdown the web server.
 
@@ -180,10 +151,7 @@ def main(log_path: Optional[str], port: int) -> None:
     port : int
         Serve HTTP at this port.
     """
-    if log_path is not None:
-        _log_to_file(log_path)
-    else:
-        _log_to_console()
+    setup_logging(log_path)
 
     LOGGER.info("Webmon: Starting process %d", os.getpid())
     LOGGER.info("Webmon: args %s", sys.argv)
