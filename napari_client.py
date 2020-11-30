@@ -1,8 +1,6 @@
 """NapariClient class.
 
-A shared memory client for napari.
-
-This client connects to napari's shared memory monitor.
+A shared memory client for napari, for use inside webmon.
 """
 import base64
 import json
@@ -93,7 +91,7 @@ class NapariClient(Thread):
         self.config = config
         self.on_shutdown = on_shutdown
 
-        self.napari_data = None
+        self.napari_data = {}
 
         pid = os.getpid()
         LOGGER.info("NapariClient: starting process %s", pid)
@@ -171,11 +169,12 @@ class NapariClient(Thread):
         """
         if self._shared.shutdown.is_set():
             LOGGER.info("NapariClient: napari signaled shutdown.")
-            return False  # Top polling.
+            return False  # Stop polling.
 
-        # Do we need to copy here? Can this data change out from
-        # under us? Do we care?
-        self.napari_data = {
+        # Do we need to copy here? Otherwise are we referring directly to
+        # the version in shared memory? That might change out from under
+        # us, but as long it does so safely, maybe that's okay?
+        self.napari_data['tile_data'] = {
             "tile_config": self._shared.data.get('tile_config'),
             "tile_state": self._shared.data.get('tile_state'),
         }
@@ -202,7 +201,8 @@ class NapariClient(Thread):
 
         Parameters
         ----------
-        on_shutdown : str
+        on_shutdown : Callable[[], None]
+            NapariClient will call this when it shuts down.
 
         Return
         ------

@@ -77,7 +77,7 @@ poll_interval_seconds = 0.01
 last_frame_number = None
 
 # Hack way to avoid spamming the viewer with duplicate data.
-last_json_str = ""
+last_tile_data = None
 
 
 def background_thread() -> None:
@@ -98,17 +98,12 @@ def background_thread() -> None:
             client.post_command(params)
         updateParams = False
 
-        # Set new napari data to viewer
-        data = client.napari_data
-        json_str = NumpyJSON.dumps(data)
-        if json_str == last_json_str:
-            continue  # Nothing new.
-
-        data_len = len(json_str)
-        LOGGER.info(json_str)
-        LOGGER.info("Emit set_tile_data: %d chars", data_len)
-        socketio.emit('set_tile_data', data, namespace='/test')
-        last_json_str = json_str
+        # We just send the whole thing every time. We could potentially
+        # only send if the data had changed since the last time
+        # we sent it. To cut down the spamming viewer with repeated
+        # data.
+        tile_data = client.napari_data['tile_data']
+        socketio.emit('set_tile_data', tile_data, namespace='/test')
 
 
 @socketio.on_error_default
