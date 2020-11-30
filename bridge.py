@@ -14,7 +14,7 @@ from napari_client import NapariClient
 LOGGER = logging.getLogger("webmon")
 
 # Number of milliseconds between sending/receiving data.
-POLL_INTERVAL_MS = 100
+POLL_INTERVAL_MS = 16.7
 POLL_INTERVAL_SECONDS = POLL_INTERVAL_MS / 1000
 
 

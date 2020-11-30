@@ -1,14 +1,18 @@
 //
 // loader.js
 //
-// Graphs about the ChunkLoader.
+// Vega-Lite graphs about the ChunkLoader.
 //
 import vegaEmbed from 'vega-embed';
 import io from 'socket.io-client';
 
-var vega_view = null;
+// Avoid these globals?
+var load_bytes_view = null;
+var load_ms_view = null;
 
-var bytes_data = []
+// Avoid these globals?
+var load_bytes_data = []
+var load_ms_data = []
 
 var params = null;
 function defineParams() {
@@ -44,35 +48,34 @@ export function connectSocketInput() {
 
         params.socket.on('send_load_data', function (msg) {
             console.log("insert data", msg)
-            bytes_data.push({ "x": bytes_data.length, "y": msg.num_bytes })
-            vega_view.insert("table", bytes_data).run();
+
+            load_bytes_data.push({ "x": load_bytes_data.length, "y": msg.num_bytes })
+            load_bytes_view.insert("table", load_bytes_data).run();
+
+            load_ms_data.push({ "x": load_ms_data.length, "y": msg.load_ms })
+            load_ms_view.insert("table", load_ms_data).run();
         });
     });
 }
 
-const chartSpec = {
-    "$schema": "https://vega.github.io/schema/vega-lite/v4.json",
-    "height": 200,
-    "padding": 50,
-    "data": { "name": "table" },
-    "mark": "area",
-    "encoding": {
-        "x": { "field": "x", "type": "quantitative" },
-        "y": { "field": "y", "type": "quantitative" }
-    }
-}
 
-
-function showChart() {
-    vegaEmbed('#vis', chartSpec, { defaultStyle: true })
+function showCharts() {
+    const load_bytes_spec = "static/specs/load_bytes.json";
+    vegaEmbed('#load_bytes', load_bytes_spec, { defaultStyle: true })
         .then(function (result) {
-            vega_view = result.view;
+            load_bytes_view = result.view;
+        });
+
+    const load_ms_spec = "static/specs/load_ms.json";
+    vegaEmbed('#load_ms', load_ms_spec, { defaultStyle: true })
+        .then(function (result) {
+            load_ms_view = result.view;
         });
 }
 
 export function startLoader() {
     console.log("startLoader");
     defineParams();
-    showChart();
+    showCharts();
     connectSocketInput();
 }

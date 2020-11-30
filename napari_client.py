@@ -23,7 +23,7 @@ BUFFER_SIZE = 1024 * 1024
 LOG_DATA_FROM_NAPARI = False
 
 # TBD what is a good poll interval is.
-POLL_INTERVAL_MS = 100
+POLL_INTERVAL_MS = 16.7
 POLL_INTERVAL_SECONDS = POLL_INTERVAL_MS / 1000
 
 # Right now we just need to magically know these callback names,
@@ -208,6 +208,7 @@ class NapariClient(Thread):
         try:
             while True:
                 try:
+                    LOGGER.info("Getting remote messages")
                     message = self._remote.client_messages.get_nowait()
                 except ConnectionResetError:
                     LOGGER.error(
@@ -215,12 +216,7 @@ class NapariClient(Thread):
                     )
                     return None
 
-                if not isinstance(message, dict):
-                    LOGGER.warning(
-                        "Ignore command that was not a dict: %s", message
-                    )
-                    continue
-
+                assert isinstance(message, dict)  # For now.
                 LOGGER.info(
                     "NapariClient.get_napari_message: %s", json.dumps(message)
                 )
