@@ -76,43 +76,46 @@ thread_lock = Lock()
 params = None
 updateParams = False
 
-# number of seconds between updates
+# Number of seconds between updates
 poll_interval_seconds = 0.01
 
-last_frame_number = None
 
-# Hack way to avoid spamming the viewer with duplicate data.
-last_tile_data = None
+class NapariClientManager:
+    def __init__(self, client: NapariClient):
+        self.client = client
 
+    def background_task(self) -> None:
+        """Send data to/from the viewer and napari."""
+        global params, updateParams
+        tid = get_ident()
+        LOGGER.info("Webmon: background thread tid=%d", tid)
 
-def background_thread() -> None:
-    """Send data to/from the viewer and napari."""
-    global params, updateParams, last_json_str
-    tid = get_ident()
-    LOGGER.info("Webmon: background thread tid=%d", tid)
+        while True:
+            socketio.sleep(poll_interval_seconds)
 
-    while True:
-        socketio.sleep(poll_interval_seconds)
+            if self.client is None:
+                continue
 
-        if client is None:
-            continue
+            if updateParams:
+                # Post data from viewer to napari.
+                LOGGER.info("Post command to napari: %s", params)
+                self.client.post_command(params)
+            updateParams = False
 
-        if updateParams:
-            # Post data from viewer to napari.
-            LOGGER.info("Post command to napari: %s", params)
-            client.post_command(params)
-        updateParams = False
-
-        # We just send the whole thing every time. We could potentially
-        # only send if the data had changed since the last time
-        # we sent it. To cut down the spamming viewer with repeated
-        # data.
-        tile_data = client.napari_data['tile_data']
-        socketio.emit('set_tile_data', tile_data, namespace='/test')
+            # We just send the whole thing every time. We could potentially
+            # only send if the data had changed since the last time
+            # we sent it. To cut down the spamming viewer with repeated
+            # data.
+            tile_data = self.client.napari_data['tile_data']
+            socketio.emit('set_tile_data', tile_data, namespace='/test')
 
 
 class WebmonHandlers(Namespace):
     """Generic handlers right now, but will be per-page soon."""
+
+    def __init__(self, namespace: str, manager: NapariClientManager):
+        super().__init__(namespace)
+        self.manager = manager
 
     def on_connection_test(self, message):
         LOGGER.info("connection_test: %s", message)
@@ -136,12 +139,13 @@ class WebmonHandlers(Namespace):
         LOGGER.info("on_connect")
         global thread
 
+        # Lock is so that we only create one background task that
+        # is shared among for all viewers.
         with thread_lock:
             if thread is None:
-                # Only create one background task for all viewers.
-                LOGGER.info("Webmon: Creating background thread...")
+                LOGGER.info("Webmon: Creating background task...")
                 thread = socketio.start_background_task(
-                    target=background_thread
+                    target=self.manager.background_task
                 )
 
 
@@ -266,7 +270,9 @@ def main(log_path: Optional[str], port: int) -> None:
     global client
     client = _create_napari_client(port)
 
-    socketio.on_namespace(WebmonHandlers('/test'))
+    manager = NapariClientManager(client)
+
+    socketio.on_namespace(WebmonHandlers('/test', manager))
 
     # socketio.run does not exit until our /stop endpoint is hit.
     socketio.run(
