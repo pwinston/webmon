@@ -52,8 +52,8 @@ export function connectSocketInput() {
 
 const chartSpec = {
     "$schema": "https://vega.github.io/schema/vega-lite/v4.json",
-    "width": 300,
     "height": 200,
+    "padding": 50,
     "data": { "name": "table" },
     "mark": "area",
     "encoding": {
