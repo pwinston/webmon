@@ -185,12 +185,13 @@ class NapariClient(Thread):
 
         return True  # Keep polling
 
-    def post_command(self, command) -> None:
+    def send_command(self, command) -> None:
         """Send new command to napari.
         """
-        LOGGER.info("Posting command %s", command)
+        LOGGER.info("Sending command %s", command)
 
         try:
+            # Put on the shared command queue.
             self._shared.commands.put(command)
         except ConnectionRefusedError:
             self._log("NapariClient: ConnectionRefusedError")
