@@ -142,18 +142,19 @@ class WebmonHandlers(Namespace):
 
 @app.route("/viewer")
 def viewer():
-    # The tile viewer.
+    """The tile viewer page."""
     return render_template("viewer.html")
 
 
 @app.route("/loader")
 def loader():
-    # The chunk loader.
+    """The ChunkLoader page"""
     return render_template("loader.html")
 
 
 @app.route("/blank")
 def blank():
+    """Black page as ane example how to expand."""
     return render_template("blank.html")
 
 
