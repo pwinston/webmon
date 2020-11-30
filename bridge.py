@@ -66,14 +66,7 @@ class NapariBridge:
                     'set_tile_data', tile_data, namespace='/test'
                 )
 
-            chart_data = [
-                {"a": "A", "b": 10},
-                {"a": "B", "b": 20},
-                {"a": "C", "b": 30},
-                {"a": "D", "b": 40},
-            ]
-            LOGGER.info("emit set_chart_data: %s", json.dumps(chart_data))
-            self.socketio.emit('set_chart_data', chart_data, namespace='/test')
+            self._process_messages()
 
     def _send_commands(self) -> None:
         """Send all pending commands."""
@@ -87,3 +80,18 @@ class NapariBridge:
                 LOGGER.info("Send Command (no client): %s", command)
             else:
                 self.client.send_command(command)
+
+    def _process_messages(self) -> None:
+        while True:
+            message = self.client.get_napari_message()
+
+            if message is None:
+                return  # No more messages.
+
+            try:
+                data = message['load']
+                self.socketio.emit('send_load_data', data, namespace='/test')
+            except KeyError:
+                LOGGER.info(
+                    "Ignoring unknown message: %s", json.dumps(message)
+                )

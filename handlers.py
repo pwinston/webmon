@@ -58,7 +58,7 @@ class WebmonHandlers(Namespace):
 
     def on_send_command(self, message):
         """Web app emits this to send a command."""
-        LOGGER.info("on_second_command")
+        LOGGER.info("on_send_command: %s", json.dumps(message))
         self.bridge.send_command(message)
 
     def on_connect(self):

@@ -8,6 +8,8 @@ import io from 'socket.io-client';
 
 var vega_view = null;
 
+var bytes_data = []
+
 var params = null;
 function defineParams() {
     params = new function () {
@@ -40,9 +42,10 @@ export function connectSocketInput() {
             console.log("input_data_response", msg);
         });
 
-        params.socket.on('set_chart_data', function (msg) {
+        params.socket.on('send_load_data', function (msg) {
             console.log("insert data", msg)
-            vega_view.insert("table", msg).run();
+            bytes_data.push({ "a": "A", "b": msg.num_bytes })
+            vega_view.insert("table", bytes_data).run();
         });
     });
 }
