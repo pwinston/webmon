@@ -15,6 +15,7 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
 
 # Build
 
+1. Install [npm](https://www.npmjs.com/get-npm)
 * `make build`
 
 # Modify JS files

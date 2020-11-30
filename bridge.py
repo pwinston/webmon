@@ -2,6 +2,7 @@
 
 Communicates between the Flask-SocketIO app and the NapariClient.
 """
+import json
 import logging
 from queue import Empty, Queue
 from threading import Thread, get_ident
@@ -55,17 +56,24 @@ class NapariBridge:
             # LOGGER.info("Sleeping %f", poll_seconds)
             self.socketio.sleep(POLL_INTERVAL_SECONDS)
 
-            if self.client is None:
-                # Really nothing to do without a client, but we allow it
-                # for testing purposes.
-                continue
-
             self._send_commands()  # Send any pending commands.
 
             # We just send the whole thing every time right now. Need
             # a good way to avoid sending redundant/identical data.
-            tile_data = self.client.napari_data['tile_data']
-            self.socketio.emit('set_tile_data', tile_data, namespace='/test')
+            if self.client is not None:
+                tile_data = self.client.napari_data['tile_data']
+                self.socketio.emit(
+                    'set_tile_data', tile_data, namespace='/test'
+                )
+
+            chart_data = [
+                {"a": "A", "b": 10},
+                {"a": "B", "b": 20},
+                {"a": "C", "b": 30},
+                {"a": "D", "b": 40},
+            ]
+            LOGGER.info("emit set_chart_data: %s", json.dumps(chart_data))
+            self.socketio.emit('set_chart_data', chart_data, namespace='/test')
 
     def _send_commands(self) -> None:
         """Send all pending commands."""
@@ -75,4 +83,7 @@ class NapariBridge:
             except Empty:
                 break  # No more commands to send.
 
-            self.client.send_command(command)
+            if self.client is None:
+                LOGGER.info("Send Command (no client): %s", command)
+            else:
+                self.client.send_command(command)
