@@ -1,6 +1,7 @@
 require('esbuild').build({
 	entryPoints: [
 		'src/viewer.js',
+		'src/loader.js'
 		// other files you want to end up in /static
 	],
 	format: 'esm',
