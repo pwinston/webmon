@@ -4,7 +4,7 @@ Communicates between the Flask-SocketIO app and the NapariClient.
 """
 import logging
 from queue import Empty, Queue
-from threading import get_ident
+from threading import Thread, get_ident
 
 from flask_socketio import SocketIO
 
@@ -12,12 +12,11 @@ from napari_client import NapariClient
 
 LOGGER = logging.getLogger("webmon")
 
+# Number of seconds between sending/receiving data.
+POLL_INTERVAL_MS = 100
+
 
 class NapariBridge:
-
-    # Number of seconds between sending/receiving data.
-    POLL_INTERVAL_MS = 100
-
     def __init__(self, socketio: SocketIO, client: NapariClient):
         self.socketio = socketio
         self.client = client
@@ -27,9 +26,13 @@ class NapariBridge:
         """Put into queue for background_task to send."""
         self.commands.put(command)
 
-    def background_task(self) -> None:
+    def start_background_task(self) -> Thread:
+        """Start our background task."""
+        return self.socketio.start_background_task(target=self._task)
+
+    def _task(self) -> None:
         """Send data to/from the viewer and napari."""
-        poll_seconds = self.POLL_INTERVAL_MS / 1000
+        poll_seconds = POLL_INTERVAL_MS / 1000
         tid = get_ident()
         LOGGER.info("Webmon: Background task thread_id=%d", tid)
 

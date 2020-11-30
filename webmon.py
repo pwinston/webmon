@@ -13,20 +13,19 @@ History
 Originally based on:
 https://github.com/ageller/FlaskTest
 """
-import json
 import logging
 import os
 import sys
 from pathlib import Path
-from threading import Lock
 from typing import Optional
 
 import click
 import requests
-from flask import Flask, render_template, session
-from flask_socketio import Namespace, SocketIO, emit
+from flask import Flask, render_template
+from flask_socketio import SocketIO
 
 from bridge import NapariBridge
+from handler import WebmonHandlers
 from lib.numpy_json import NumpyJSON
 from napari_client import NapariClient
 
@@ -70,46 +69,6 @@ ASYNC_MODE = "eventlet"
 
 # Flask-SocketIO.
 socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
-
-thread = None
-thread_lock = Lock()
-
-
-class WebmonHandlers(Namespace):
-    """Generic handlers right now, but will be per-page soon?"""
-
-    def __init__(self, namespace: str, bridge: NapariBridge):
-        super().__init__(namespace)
-        self.bridge = bridge
-
-    def on_connection_test(self, message):
-        LOGGER.info("connection_test: %s", message)
-        session['receive_count'] = session.get('receive_count', 0) + 1
-        emit(
-            'connection_response',
-            {'data': message['data'], 'count': session['receive_count']},
-        )
-
-    def on_input_data_request(self, message):
-        session['receive_count'] = session.get('receive_count', 0) + 1
-        data = {'client': "webmon", 'pid': os.getpid()}
-        emit('input_data_response', json.dumps(data))
-
-    def on_gui_input(self, message):
-        self.bridge.send_command(message)
-
-    def on_connect(self):
-        LOGGER.info("on_connect")
-        global thread
-
-        # Lock is so that we only create one background task that
-        # is shared among for all viewers.
-        with thread_lock:
-            if thread is None:
-                LOGGER.info("Webmon: Creating background task...")
-                thread = socketio.start_background_task(
-                    target=self.bridge.background_task
-                )
 
 
 @app.route("/viewer")
@@ -235,7 +194,7 @@ def main(log_path: Optional[str], port: int) -> None:
 
     bridge = NapariBridge(socketio, client)
 
-    socketio.on_namespace(WebmonHandlers('/test', bridge))
+    socketio.on_namespace(WebmonHandlers(bridge, '/test'))
 
     # socketio.run does not exit until our /stop endpoint is hit.
     socketio.run(
