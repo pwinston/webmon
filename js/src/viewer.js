@@ -30,6 +30,9 @@ const SHOW_VIEW = true;
 
 function setTileConfig(config) {
 
+	if (!config)
+		return
+
 	const newRows = parseInt(config.shape_in_tiles[0]);
 	const newCols = parseInt(config.shape_in_tiles[1]);
 
@@ -47,6 +50,9 @@ function setTileConfig(config) {
 }
 
 function setTileState(state) {
+	if (!state)
+		return
+
 	tileState.seen = state.seen;
 	tileState.corners = state.corners;
 	if (SHOW_TILES) {
@@ -326,8 +332,8 @@ function createGUI() {
 // Send the GUI settings back to Flask.
 //
 function sendGUIinfo() {
-	console.log("SEND GUI", externalParams);
-	internalParams.socket.emit('gui_input', externalParams);
+	console.log("send command", externalParams);
+	internalParams.socket.emit('send_command', externalParams);
 }
 
 //

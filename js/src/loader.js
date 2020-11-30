@@ -57,7 +57,7 @@ function showChart() {
     vegaEmbed('#vis', spec, { defaultStyle: true })
         .then(function (result) {
             const view = result.view;
-        }
+        });
 }
 
 export function startLoader() {
