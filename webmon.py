@@ -25,7 +25,7 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO
 
 from bridge import NapariBridge
-from handler import WebmonHandlers
+from handlers import WebmonHandlers
 from lib.numpy_json import NumpyJSON
 from napari_client import NapariClient
 

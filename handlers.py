@@ -2,6 +2,7 @@
 
 SocketIO handlers for webmon.
 """
+import json
 import logging
 import os
 from threading import Lock
