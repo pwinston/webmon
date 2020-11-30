@@ -12,11 +12,27 @@ from napari_client import NapariClient
 
 LOGGER = logging.getLogger("webmon")
 
-# Number of seconds between sending/receiving data.
+# Number of milliseconds between sending/receiving data.
 POLL_INTERVAL_MS = 100
+POLL_INTERVAL_SECONDS = POLL_INTERVAL_MS / 1000
 
 
 class NapariBridge:
+    """Bridge between webmon and NapariClient.
+
+    Parameters
+    ----------
+    socketio : SocketIO
+        The main SocketIO instance.
+    client : NapariClient
+        The client that's talking to napari.
+
+    Attributes
+    ----------
+    commands : Queue
+        set_command() puts command into this queue.
+    """
+
     def __init__(self, socketio: SocketIO, client: NapariClient):
         self.socketio = socketio
         self.client = client
@@ -32,23 +48,22 @@ class NapariBridge:
 
     def _task(self) -> None:
         """Send data to/from the viewer and napari."""
-        poll_seconds = POLL_INTERVAL_MS / 1000
         tid = get_ident()
         LOGGER.info("Webmon: Background task thread_id=%d", tid)
 
         while True:
             # LOGGER.info("Sleeping %f", poll_seconds)
-            self.socketio.sleep(poll_seconds)
+            self.socketio.sleep(POLL_INTERVAL_SECONDS)
 
             if self.client is None:
+                # Really nothing to do without a client, but we allow it
+                # for testing purposes.
                 continue
 
             self._send_commands()  # Send any pending commands.
 
-            # We just send the whole thing every time. We could potentially
-            # only send if the data had changed since the last time
-            # we sent it. To cut down the spamming viewer with repeated
-            # data.
+            # We just send the whole thing every time right now. Need
+            # a good way to avoid sending redundant/identical data.
             tile_data = self.client.napari_data['tile_data']
             self.socketio.emit('set_tile_data', tile_data, namespace='/test')
 
@@ -58,6 +73,6 @@ class NapariBridge:
             try:
                 command = self.commands.get_nowait()
             except Empty:
-                break  # No more commands to end.
-            LOGGER.info("Send command to napari: %s", command)
+                break  # No more commands to send.
+
             self.client.send_command(command)
