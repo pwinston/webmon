@@ -18,6 +18,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from queue import Empty, Queue
 from threading import Lock, get_ident
 from typing import Optional
 
@@ -72,10 +73,6 @@ socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
 thread = None
 thread_lock = Lock()
 
-# global variables to hold the params and camera
-params = None
-updateParams = False
-
 # Number of seconds between updates
 poll_interval_seconds = 0.01
 
@@ -83,12 +80,16 @@ poll_interval_seconds = 0.01
 class NapariClientManager:
     def __init__(self, client: NapariClient):
         self.client = client
+        self.commands = Queue()
+
+    def send_command(self, command) -> None:
+        """Put into queue for background_task to send."""
+        self.commands.put(command)
 
     def background_task(self) -> None:
         """Send data to/from the viewer and napari."""
-        global params, updateParams
         tid = get_ident()
-        LOGGER.info("Webmon: background thread tid=%d", tid)
+        LOGGER.info("Webmon: Background task thread_id=%d", tid)
 
         while True:
             socketio.sleep(poll_interval_seconds)
@@ -96,11 +97,7 @@ class NapariClientManager:
             if self.client is None:
                 continue
 
-            if updateParams:
-                # Post data from viewer to napari.
-                LOGGER.info("Post command to napari: %s", params)
-                self.client.post_command(params)
-            updateParams = False
+            self._send_commands()  # Send any pending commands.
 
             # We just send the whole thing every time. We could potentially
             # only send if the data had changed since the last time
@@ -108,6 +105,16 @@ class NapariClientManager:
             # data.
             tile_data = self.client.napari_data['tile_data']
             socketio.emit('set_tile_data', tile_data, namespace='/test')
+
+    def _send_commands(self) -> None:
+        """Send all pending commands."""
+        while True:
+            try:
+                command = self.commands.get_nowait()
+            except Empty:
+                break  # No more commands to end.
+            LOGGER.info("Send command to napari: %s", command)
+            self.client.send_command(command)
 
 
 class WebmonHandlers(Namespace):
@@ -131,9 +138,7 @@ class WebmonHandlers(Namespace):
         emit('input_data_response', json.dumps(data))
 
     def on_gui_input(self, message):
-        global params, updateParams
-        updateParams = True
-        params = message
+        self.manager.send_command(message)
 
     def on_connect(self):
         LOGGER.info("on_connect")
