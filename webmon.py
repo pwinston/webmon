@@ -54,12 +54,15 @@ client = None
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-# Specifiy gevent. Has some trouble with eventlet although could try it again.
-# If this is none then SocketIO will select a transport, but I'd rather
-# specify it so everyone is using the same one, if it works.
-async_mode = "eventlet"
+# Specifiy eventlet just so we are all running the same thing. But no idea
+# yet which mode is really best for us. Note that we don't call
+# eventet.monkey_patch(). That caused a problem with SharedMemoryManager's
+# socket:
+# https://github.com/eventlet/eventlet/issues/670
+# But it didn't seem necessary.
+ASYNC_MODE = "eventlet"
 
-socketio = SocketIO(app, async_mode=async_mode, json=NumpyJSON)
+socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
 
 thread = None
 thread_lock = Lock()
