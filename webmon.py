@@ -24,7 +24,7 @@ from typing import Optional
 import click
 import requests
 from flask import Flask, render_template, session
-from flask_socketio import SocketIO, emit
+from flask_socketio import Namespace, SocketIO, emit
 
 from lib.numpy_json import NumpyJSON
 from napari_client import NapariClient
@@ -106,49 +106,38 @@ def background_thread() -> None:
         socketio.emit('set_tile_data', tile_data, namespace='/test')
 
 
-@socketio.on_error_default
-def default_error_handler(e):
-    LOGGER.error(e)
+class WebmonHandlers(Namespace):
+    """Generic handlers right now, but will be per-page soon."""
 
+    def on_connection_test(self, message):
+        LOGGER.info("connection_test: %s", message)
+        session['receive_count'] = session.get('receive_count', 0) + 1
+        emit(
+            'connection_response',
+            {'data': message['data'], 'count': session['receive_count']},
+        )
 
-# Testing the connection.
-@socketio.on('connection_test', namespace='/test')
-def connection_test(message):
-    LOGGER.info("connection_test: %s", message)
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    emit(
-        'connection_response',
-        {'data': message['data'], 'count': session['receive_count']},
-    )
+    def on_input_data_request(self, message):
+        session['receive_count'] = session.get('receive_count', 0) + 1
+        data = {'client': "webmon", 'pid': os.getpid()}
+        emit('input_data_response', json.dumps(data))
 
+    def on_gui_input(self, message):
+        global params, updateParams
+        updateParams = True
+        params = message
 
-# Sending data.
-@socketio.on('input_data_request', namespace='/test')
-def input_data_request(message):
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    data = {'client': "webmon", 'pid': os.getpid()}
-    emit('input_data_response', json.dumps(data))
+    def on_connect(self):
+        LOGGER.info("on_connect")
+        global thread
 
-
-# Receive data from viewer.
-@socketio.on('gui_input', namespace='/test')
-def gui_input(message):
-    global params, updateParams
-    updateParams = True
-    params = message
-
-
-# Background task, send/receive data to viewers.
-@socketio.on('connect', namespace='/test')
-def from_gui():
-    LOGGER.info("connect")
-    global thread
-
-    with thread_lock:
-        if thread is None:
-            # Only create one background task for all viewers.
-            LOGGER.info("Webmon: Creating background thread...")
-            thread = socketio.start_background_task(target=background_thread)
+        with thread_lock:
+            if thread is None:
+                # Only create one background task for all viewers.
+                LOGGER.info("Webmon: Creating background thread...")
+                thread = socketio.start_background_task(
+                    target=background_thread
+                )
 
 
 @app.route("/viewer")
@@ -173,11 +162,9 @@ def stop():
     """Stop the socketio server.
 
     The documentation says socketio.stop() "must be called from a HTTP or
-    SocketIO handler function".
-    
-    So our on_shutdown() function hits this endpoint to stop socketio. When
-    socketio is stopped the socketio.run() call in main will return and the
-    process will exit.
+    SocketIO handler function". So we have this endpoint which our
+    on_shutdown() function hits. When socketio is stopped the
+    socketio.run() call in main will return and the process will exit.
     """
     LOGGER.info("/stop -> stopping socketio.")
     socketio.stop()
@@ -266,6 +253,8 @@ def main(log_path: Optional[str], port: int) -> None:
 
     global client
     client = _create_napari_client(port)
+
+    socketio.on_namespace(WebmonHandlers('/test'))
 
     # socketio.run does not exit until our /stop endpoint is hit.
     socketio.run(
