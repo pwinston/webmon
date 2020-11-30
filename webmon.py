@@ -156,10 +156,16 @@ def from_gui():
             thread = socketio.start_background_task(target=background_thread)
 
 
-# Our only page.
 @app.route("/viewer")
 def viewer():
+    # The tile viewer.
     return render_template("viewer.html")
+
+
+@app.route("/loader")
+def loader():
+    # The chunk loader.
+    return render_template("loader.html")
 
 
 @app.route("/blank")
@@ -172,29 +178,15 @@ def stop():
     """Stop the socketio server.
 
     The documentation says socketio.stop() "must be called from a HTTP or
-    SocketIO handler function". So our on_shutudown() function hits this
-    endpoint to stop socketio.
-
-    Once socketio is stopped the socketio.run() call in main will return
-    and the process will exit.
+    SocketIO handler function".
+    
+    So our on_shutdown() function hits this endpoint to stop socketio. When
+    socketio is stopped the socketio.run() call in main will return and the
+    process will exit.
     """
     LOGGER.info("/stop -> stopping socketio.")
     socketio.stop()
     return "<h1>Stop</h1>Stopped socketio."
-
-
-def _delete_old_log(path: str) -> None:
-    """Delete the previous log file.
-
-    Parameters
-    ----------
-    path : str
-        The log file to delete.
-    """
-    try:
-        Path(path).unlink()
-    except FileNotFoundError:
-        pass  # It didn't exist.
 
 
 def _log_to_file(path: str) -> None:
@@ -206,7 +198,10 @@ def _log_to_file(path: str) -> None:
         Log to this file path.
     """
     if DELETE_LOG_FILE:
-        _delete_old_log(path)
+        try:
+            Path(path).unlink()
+        except FileNotFoundError:
+            pass  # It didn't exist.
 
     fh = logging.FileHandler(path)
     LOGGER.addHandler(fh)

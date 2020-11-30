@@ -1,28 +1,35 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<meta charset="utf-8">
-		<title>Napari Monitor</title>
-		<link href="/static/styles.css" rel="stylesheet">
-	</head>
+
+<head>
+	<meta charset="utf-8">
+	<title>Napari Monitor</title>
+	<link href="/static/styles.css" rel="stylesheet">
+</head>
 
 
-	<nav class="flex items-center justify-between flex-wrap bg-gray-400 p-4">
-		<div class="w-full block flex-grow lg:flex lg:items-center lg:w-auto">
-			<div class="text-sm lg:flex-grow">
-				<a href="/viewer" class="block mt-4 lg:inline-block lg:mt-0 text-teal-200 hover:text-white mr-4">
-					Viewer
-				</a>
-				<a href="/blank" class="block mt-4 lg:inline-block lg:mt-0 text-teal-200 hover:text-white mr-4">
-					Blank
-				</a>
-			</div>
+<nav class="flex items-center justify-between flex-wrap bg-gray-400 p-4">
+	<div class="w-full block flex-grow lg:flex lg:items-center lg:w-auto">
+		<div class="text-sm lg:flex-grow">
+			<a href="/viewer" class="block mt-4 lg:inline-block lg:mt-0 text-teal-200 hover:text-white mr-4">
+				Viewer
+			</a>
+			<a href="/loader" class="block mt-4 lg:inline-block lg:mt-0 text-teal-200 hover:text-white mr-4">
+				Loader
+			</a>
+			<a href="/loader" class="block mt-4 lg:inline-block lg:mt-0 text-teal-200 hover:text-white mr-4">
+				Loader
+			</a>
+			<a href="/blank" class="block mt-4 lg:inline-block lg:mt-0 text-teal-200 hover:text-white mr-4">
+				Blank
+			</a>
 		</div>
-	</nav>
-	
-	<body>
-		{% block content %}
-		{% endblock %}
-	</body>
-</html>
+	</div>
+</nav>
 
+<body>
+	{% block content %}
+	{% endblock %}
+</body>
+
+</html>
