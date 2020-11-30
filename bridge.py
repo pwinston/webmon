@@ -34,7 +34,7 @@ class NapariBridge:
         LOGGER.info("Webmon: Background task thread_id=%d", tid)
 
         while True:
-            LOGGER.info("Sleeping %f", poll_seconds)
+            # LOGGER.info("Sleeping %f", poll_seconds)
             self.socketio.sleep(poll_seconds)
 
             if self.client is None:

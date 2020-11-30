@@ -49,25 +49,26 @@ USE_RELOADER = False
 # cons to deleting it depending on how you are monitoring it.
 DELETE_LOG_FILE = False
 
-# The NapariClient
-client = None
-
+# Flask.
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-# Specifiy eventlet just so we are all running the same thing. However
+# Eventlet
+# --------
+# Specify eventlet just so we are all running the same thing. However
 # eventlet developer says it's really intended for 100's of simultaneous
-# connections! So maybe it is overkill.
+# connections! So maybe it is overkill. But what else should we use?
 #
-# Note that we don't call eventlet.monkey_patch(). That causes a problem
-# with SharedMemoryManager's socket:
+# Note that we don't call eventlet.monkey_patch(). It patches various
+# standard library functions to be "green" compatible. But it causes
+# a crash today with SharedMemoryManager:
 #
 # https://github.com/eventlet/eventlet/issues/670
 #
-# But monkey_patch() doesn't seem to be necessary. It patches various
-# standard library functions to be "green" compatible.
+# And monkey_patch() doesn't seem to be necessary for us?
 ASYNC_MODE = "eventlet"
 
+# Flask-SocketIO.
 socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
 
 thread = None
@@ -75,7 +76,7 @@ thread_lock = Lock()
 
 
 class WebmonHandlers(Namespace):
-    """Generic handlers right now, but will be per-page soon."""
+    """Generic handlers right now, but will be per-page soon?"""
 
     def __init__(self, namespace: str, bridge: NapariBridge):
         super().__init__(namespace)
