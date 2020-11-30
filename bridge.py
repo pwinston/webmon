@@ -90,6 +90,7 @@ class NapariBridge:
 
             try:
                 data = message['load']
+                LOGGER.info("send_load_data: %s", json.dumps(data))
                 self.socketio.emit('send_load_data', data, namespace='/test')
             except KeyError:
                 LOGGER.info(
