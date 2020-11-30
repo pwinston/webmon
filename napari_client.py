@@ -221,6 +221,9 @@ class NapariClient(Thread):
                     )
                     continue
 
+                LOGGER.info(
+                    "NapariClient.get_napari_message: %s", json.dumps(message)
+                )
                 return message
         except Empty:
             return None  # No more messages.
