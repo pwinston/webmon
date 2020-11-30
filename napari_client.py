@@ -1,4 +1,4 @@
-"""MonitorClient class.
+"""NapariClient class.
 
 A shared memory client for napari.
 
@@ -13,13 +13,16 @@ import time
 from multiprocessing.managers import SharedMemoryManager
 from queue import Queue
 from threading import Event, Thread
-from typing import NamedTuple, Optional
+from typing import Callable, NamedTuple, Optional
+
+from lib.numpy_json import NumpyJSON
 
 LOGGER = logging.getLogger("webmon")
 
 BUFFER_SIZE = 1024 * 1024
 
-DUMP_DATA_FROM_NAPARI = False
+# Results in a lot of log spam.
+LOG_DATA_FROM_NAPARI = False
 
 # TBD what is a good poll interval is.
 POLL_INTERVAL_MS = 100
@@ -43,7 +46,7 @@ def _get_client_config() -> dict:
     """
     env_str = os.getenv("NAPARI_MON_CLIENT")
     if env_str is None:
-        print("MonitorClient: NAPARI_MON_CLIENT not defined")
+        print("NapariClient: NAPARI_MON_CLIENT not defined")
         return None
 
     env_bytes = env_str.encode('ascii')
@@ -60,7 +63,7 @@ def _log_env(all_vars=False):
             LOGGER.info("%s = %s", key, value)
 
 
-class MonitorClient(Thread):
+class NapariClient(Thread):
     """Client for napari shared memory monitor.
 
     Napari launches us. We get config information from our NAPARI_MON_CLIENT
@@ -84,21 +87,20 @@ class MonitorClient(Thread):
     Data from napari's monitor.add() command.
     """
 
-    def __init__(self, config: dict, client_name="?"):
+    def __init__(self, config: dict, on_shutdown: Callable[[], None]):
         super().__init__()
         assert config
         self.config = config
-        self.client_name = client_name
+        self.on_shutdown = on_shutdown
 
-        self.running = True
         self.napari_data = None
 
         pid = os.getpid()
-        LOGGER.info("Starting MonitorClient process %s", pid)
+        LOGGER.info("NapariClient: starting process %s", pid)
         _log_env()
 
         server_port = config['server_port']
-        LOGGER.info("Process %s connecting to port %d...", pid, server_port)
+        LOGGER.info("NapariClient: connecting to port %d.", server_port)
 
         # Right now we just need to magically know these callback names,
         # maybe we can come up with a better way.
@@ -124,68 +126,90 @@ class MonitorClient(Thread):
         self.start()
 
     def run(self) -> None:
-        """Check shared memory for new data."""
+        """Thread that communicates with napari."""
 
         tid = threading.get_ident()
-        LOGGER.info("MonitorClient thread %d started...", tid)
+        LOGGER.info("NapariClient: thread %d started.", tid)
 
         poll_interval_seconds = POLL_INTERVAL_MS / 1000
 
         while True:
-            if not self._poll():
-                break
+            try:
+                if not self._poll():
+                    break  # Exit thread.
+            except ConnectionResetError:
+                LOGGER.info("NapariClient: ConnectionResetError.")
+                break  # Exit thread.
 
+            # Sleep until ready to poll again.
             time.sleep(poll_interval_seconds)
 
-        # webmon checks this and stops/exits.
-        self.running = False
+        LOGGER.info("NapariClient: thread %d is exiting.", tid)
 
-        LOGGER.info("MonitorClient exiting thread...")
+        # Notify webmon that we shutdown.
+        self.on_shutdown()
 
     def _poll(self) -> bool:
-        """See if there is now information in shared mem."""
+        """Process data to/from napari.
 
-        # LOGGER.info("Poll...")
-        try:
-            if self._shared.shutdown.is_set():
-                # We sometimes do see the shutdown event was set. But usually
-                # we just get ConnectionResetError, because napari is exiting.
-                LOGGER.info("Shutdown event was set.")
-                return False  # Stop polling
-        except ConnectionResetError:
-            LOGGER.info("ConnectionResetError.")
-            return False  # Stop polling
+        Return
+        ------
+        bool
+            Return True if we should keep polling.
 
-        # Do we need to copy here?
+        Note
+        ----
+        Today Napari signals its shutdown event and then immediately exits.
+        Therefore most of the time we get a ConnectionResetError and never
+        actually see that the event was signaled.
+
+        This is fine for now. If we need a cleaner shutdown sequence we
+        could have napari wait on a shutdown event from each running
+        client. With a short 1-2 second timeout so it never hangs. Then
+        both napari and the client would have the chance to do some
+        final cleanup.
+        """
+        if self._shared.shutdown.is_set():
+            LOGGER.info("NapariClient: napari signaled shutdown.")
+            return False  # Top polling.
+
+        # Do we need to copy here? Can this data change out from
+        # under us? Do we care?
         self.napari_data = {
             "tile_config": self._shared.data.get('tile_config'),
             "tile_state": self._shared.data.get('tile_state'),
         }
 
-        if DUMP_DATA_FROM_NAPARI:
-            pretty_str = json.dumps(self.napari_data, indent=4)
-            LOGGER.info("New data from napari: %s", pretty_str)
+        if LOG_DATA_FROM_NAPARI:
+            pretty_str = NumpyJSON.dumps(self.napari_data, indent=4)
+            LOGGER.info("NapariClient: New data from napari: %s", pretty_str)
 
         return True  # Keep polling
 
     def post_command(self, command) -> None:
         """Send new command to napari.
         """
-        LOGGER.info(f"Posting command {command}")
+        LOGGER.info("Posting command %s", command)
 
         try:
             self._shared.commands.put(command)
         except ConnectionRefusedError:
-            self._log("ConnectionRefusedError")
+            self._log("NapariClient: ConnectionRefusedError")
 
-    def stop(self) -> None:
-        """Call on shutdown. TODO_MON: no one calls this yet?"""
-        self._manager.shutdown()
+    @classmethod
+    def create(cls, on_shutdown: Callable[[], None]):
+        """Create and return the NapariClient instance.
 
+        Parameters
+        ----------
+        on_shutdown : str
 
-def create_napari_client(client_name) -> Optional[MonitorClient]:
-    """Napari monitor client."""
-    config = _get_client_config()
-    if config is None:
-        return None
-    return MonitorClient(config, client_name)
+        Return
+        ------
+        Optional[NapariClient]
+            The newly created client or None on error.
+        """
+        config = _get_client_config()
+        if config is None:
+            return None
+        return cls(config, on_shutdown)

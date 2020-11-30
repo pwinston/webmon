@@ -71,21 +71,25 @@ function setTileData(msg) {
 // https://github.com/miguelgrinberg/Flask-SocketIO
 //
 export function connectSocketInput() {
+	console.log("connectSocketInput")
 
 	document.addEventListener("DOMContentLoaded", function (event) {
 
+		console.log("DOMContentLoaded")
+
+		// Connect invoked when a connection with the server setup.
 		internalParams.socket.on('connect', function () {
-			// Connect invoked when a connection with the server setup.
+			console.log("connect")
 			internalParams.socket.emit('connection_test', { data: 'I\'m the viewer!' });
 			internalParams.socket.emit('input_data_request', { data: 'requesting data' });
 		});
 
 		internalParams.socket.on('connection_response', function (msg) {
-			console.log(msg);
+			console.log("connection_response:", msg);
 		});
 
 		internalParams.socket.on('input_data_response', function (msg) {
-			console.log("data received", msg);
+			console.log("input_data_response", msg);
 		});
 
 		internalParams.socket.on('set_tile_data', function (msg) {
@@ -324,7 +328,7 @@ function createGUI() {
 }
 
 //
-// Send the from GUI back to Flask.
+// Send the GUI settings back to Flask.
 //
 function sendGUIinfo() {
 	console.log("SEND GUI", externalParams);
@@ -357,4 +361,6 @@ export function startViewer() {
 
 	createViewer();
 	animateViewer();
+
+	connectSocketInput();
 }

@@ -7,7 +7,7 @@
   },
   "dependencies": {
     "dat.gui": "^0.7.7",
-    "socket.io-client": "^3.0.3",
+    "socket.io-client": "~2.3.0",
     "three": "^0.123.0"
   }
 }
