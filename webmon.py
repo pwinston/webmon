@@ -54,12 +54,17 @@ client = None
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-# Specifiy eventlet just so we are all running the same thing. But no idea
-# yet which mode is really best for us. Note that we don't call
-# eventet.monkey_patch(). That caused a problem with SharedMemoryManager's
-# socket:
+# Specifiy eventlet just so we are all running the same thing. However
+# eventlet developer says it's really intended for 100's of simultaneous
+# connections! So maybe it is overkill.
+#
+# Note that we don't call eventlet.monkey_patch(). That causes a problem
+# with SharedMemoryManager's socket:
+#
 # https://github.com/eventlet/eventlet/issues/670
-# But it didn't seem necessary.
+#
+# But monkey_patch() doesn't seem to be necessary. It patches various
+# standard library functions to be "green" compatible.
 ASYNC_MODE = "eventlet"
 
 socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
@@ -198,6 +203,20 @@ def _log_to_console() -> None:
     LOGGER.info("Logging to console.")
 
 
+def _notify_stop(port: int) -> None:
+    """Shutdown the web server.
+
+    This is called when NapariClient is shutting down. It shuts down
+    when it detects the napari it was connected to shuts down. So
+    we call our /stop endpoint to shutdown socketio.
+    """
+    stop_url = f"http://localhost:{port}/stop"
+    try:
+        requests.get(stop_url)
+    except requests.exceptions.ConnectionError:
+        LOGGER.error("Webmon: requests.exceptions.ConnectionError")
+
+
 def _create_napari_client(port: int):
     """Create and return the NapariClient.
 
@@ -206,27 +225,19 @@ def _create_napari_client(port: int):
     port : int
         The port number of the web server.
     """
-
-    def on_shutdown() -> None:
-        """Shutdown the web server.
-
-        This is called when NapariClient is shutting down. It shuts down
-        when it detects the napari it was connected to shuts down. So
-        we call our /stop endpoint to shutdown socketio.
-        """
-        stop_url = f"http://localhost:{port}/stop"
-        try:
-            requests.get(stop_url)
-        except requests.exceptions.ConnectionError:
-            LOGGER.error("Webmon: requests.exceptions.ConnectionError")
-
     if not CREATE_CLIENT:
+        LOGGER.error("NapariClient not created, CREATE_CLIENT=False.")
         return None
 
-    client = NapariClient.create(on_shutdown)
+    def _on_shutdown() -> None:
+        """Hit endpoint /stop."""
+        _notify_stop(port)
+
+    # Create the client.
+    client = NapariClient.create(_on_shutdown)
 
     if client is None:
-        LOGGER.error("NapariClient not created.")
+        LOGGER.error("NapariClient not created, no config file?")
 
     return client
 
