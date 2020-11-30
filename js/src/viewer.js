@@ -1,9 +1,7 @@
+//
 // viewer.js
 //
-// Proof of Concept Napari Monitor WebUI. Right now focusing just on the 
-// display of the octree tiles and the view into those.
-//
-// Modified from https://github.com/ageller/FlaskTest
+// WebGL display of which octree tiles are visible in napari.
 //
 import * as THREE from 'three';
 import { GUI } from 'dat.gui';
@@ -71,16 +69,13 @@ function setTileData(msg) {
 // https://github.com/miguelgrinberg/Flask-SocketIO
 //
 export function connectSocketInput() {
-	console.log("connectSocketInput")
 
 	document.addEventListener("DOMContentLoaded", function (event) {
-
-		console.log("DOMContentLoaded")
 
 		// Connect invoked when a connection with the server setup.
 		internalParams.socket.on('connect', function () {
 			console.log("connect")
-			internalParams.socket.emit('connection_test', { data: 'I\'m the viewer!' });
+			internalParams.socket.emit('connection_test', { data: 'viewer.js' });
 			internalParams.socket.emit('input_data_request', { data: 'requesting data' });
 		});
 
