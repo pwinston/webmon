@@ -44,28 +44,27 @@ export function connectSocketInput() {
 
         params.socket.on('send_load_data', function (msg) {
             console.log("insert data", msg)
-            bytes_data.push({ "a": "A", "b": msg.num_bytes })
+            bytes_data.push({ "x": bytes_data.length, "y": msg.num_bytes })
             vega_view.insert("table", bytes_data).run();
         });
     });
 }
 
+const chartSpec = {
+    "$schema": "https://vega.github.io/schema/vega-lite/v4.json",
+    "width": 300,
+    "height": 200,
+    "data": { "name": "table" },
+    "mark": "area",
+    "encoding": {
+        "x": { "field": "x", "type": "quantitative" },
+        "y": { "field": "y", "type": "quantitative" }
+    }
+}
+
+
 function showChart() {
-    var spec = {
-        "$schema": "https://vega.github.io/schema/vega-lite/v4.json",
-        "description": "A simple bar chart with embedded data.",
-        "width": 360,
-        "data": {
-            "name": "table"
-        },
-        "mark": "bar",
-        "encoding": {
-            "x": { "field": "a", "type": "ordinal" },
-            "y": { "field": "b", "type": "quantitative" },
-            "tooltip": { "field": "b", "type": "quantitative" }
-        }
-    };
-    vegaEmbed('#vis', spec, { defaultStyle: true })
+    vegaEmbed('#vis', chartSpec, { defaultStyle: true })
         .then(function (result) {
             vega_view = result.view;
         });
