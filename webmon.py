@@ -13,19 +13,20 @@ History
 Originally based on:
 https://github.com/ageller/FlaskTest
 """
-import json
 import logging
 import os
 import sys
 from pathlib import Path
-from threading import Lock, get_ident
 from typing import Optional
 
 import click
 import requests
-from flask import Flask, render_template, session
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template
+from flask_socketio import SocketIO
 
+from bridge import NapariBridge
+from handlers import WebmonHandlers
+from lib.logging import setup_logging
 from lib.numpy_json import NumpyJSON
 from napari_client import NapariClient
 
@@ -44,132 +45,44 @@ CREATE_CLIENT = True
 # run a 2nd process, we could turn this back on.
 USE_RELOADER = False
 
-# If true we delete the previous log file on startup. There are pros and
-# cons to deleting it depending on how you are monitoring it.
-DELETE_LOG_FILE = False
-
-# The NapariClient
-client = None
-
+# Flask.
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 
-# Specifiy eventlet just so we are all running the same thing. But no idea
-# yet which mode is really best for us. Note that we don't call
-# eventet.monkey_patch(). That caused a problem with SharedMemoryManager's
-# socket:
+# Eventlet
+# --------
+# Specify eventlet just so we are all running the same thing. However
+# eventlet developer says it's really intended for 100's of simultaneous
+# connections! So maybe it is overkill. But what else should we use?
+#
+# Note that we don't call eventlet.monkey_patch(). It patches various
+# standard library functions to be "green" compatible. But it causes
+# a crash today with SharedMemoryManager:
+#
 # https://github.com/eventlet/eventlet/issues/670
-# But it didn't seem necessary.
+#
+# And monkey_patch() doesn't seem to be necessary for us?
 ASYNC_MODE = "eventlet"
 
+# Flask-SocketIO.
 socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
-
-thread = None
-thread_lock = Lock()
-
-# global variables to hold the params and camera
-params = None
-updateParams = False
-
-# number of seconds between updates
-poll_interval_seconds = 0.01
-
-last_frame_number = None
-
-# Hack way to avoid spamming the viewer with duplicate data.
-last_json_str = ""
-
-
-def background_thread() -> None:
-    """Send data to/from the viewer and napari."""
-    global params, updateParams, last_json_str
-    tid = get_ident()
-    LOGGER.info("Webmon: background thread tid=%d", tid)
-
-    while True:
-        socketio.sleep(poll_interval_seconds)
-
-        if client is None:
-            continue
-
-        if updateParams:
-            # Post data from viewer to napari.
-            LOGGER.info("Post command to napari: %s", params)
-            client.post_command(params)
-        updateParams = False
-
-        # Set new napari data to viewer
-        data = client.napari_data
-        json_str = NumpyJSON.dumps(data)
-        if json_str == last_json_str:
-            continue  # Nothing new.
-
-        data_len = len(json_str)
-        LOGGER.info(json_str)
-        LOGGER.info("Emit set_tile_data: %d chars", data_len)
-        socketio.emit('set_tile_data', data, namespace='/test')
-        last_json_str = json_str
-
-
-@socketio.on_error_default
-def default_error_handler(e):
-    LOGGER.error(e)
-
-
-# Testing the connection.
-@socketio.on('connection_test', namespace='/test')
-def connection_test(message):
-    LOGGER.info("connection_test: %s", message)
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    emit(
-        'connection_response',
-        {'data': message['data'], 'count': session['receive_count']},
-    )
-
-
-# Sending data.
-@socketio.on('input_data_request', namespace='/test')
-def input_data_request(message):
-    session['receive_count'] = session.get('receive_count', 0) + 1
-    data = {'client': "webmon", 'pid': os.getpid()}
-    emit('input_data_response', json.dumps(data))
-
-
-# Receive data from viewer.
-@socketio.on('gui_input', namespace='/test')
-def gui_input(message):
-    global params, updateParams
-    updateParams = True
-    params = message
-
-
-# Background task, send/receive data to viewers.
-@socketio.on('connect', namespace='/test')
-def from_gui():
-    LOGGER.info("connect")
-    global thread
-
-    with thread_lock:
-        if thread is None:
-            # Only create one background task for all viewers.
-            LOGGER.info("Webmon: Creating background thread...")
-            thread = socketio.start_background_task(target=background_thread)
 
 
 @app.route("/viewer")
 def viewer():
-    # The tile viewer.
+    """The tile viewer page."""
     return render_template("viewer.html")
 
 
 @app.route("/loader")
 def loader():
-    # The chunk loader.
+    """The ChunkLoader page"""
     return render_template("loader.html")
 
 
 @app.route("/blank")
 def blank():
+    """Black page as ane example how to expand."""
     return render_template("blank.html")
 
 
@@ -178,41 +91,27 @@ def stop():
     """Stop the socketio server.
 
     The documentation says socketio.stop() "must be called from a HTTP or
-    SocketIO handler function".
-    
-    So our on_shutdown() function hits this endpoint to stop socketio. When
-    socketio is stopped the socketio.run() call in main will return and the
-    process will exit.
+    SocketIO handler function". So we have this endpoint which our
+    on_shutdown() function hits. When socketio is stopped the
+    socketio.run() call in main will return and the process will exit.
     """
     LOGGER.info("/stop -> stopping socketio.")
     socketio.stop()
     return "<h1>Stop</h1>Stopped socketio."
 
 
-def _log_to_file(path: str) -> None:
-    """Log "napari.async" messages to the given file.
+def _notify_stop(port: int) -> None:
+    """Shutdown the web server.
 
-    Parameters
-    ----------
-    path : str
-        Log to this file path.
+    This is called when NapariClient is shutting down. It shuts down
+    when it detects the napari it was connected to shuts down. So
+    we call our /stop endpoint to shutdown socketio.
     """
-    if DELETE_LOG_FILE:
-        try:
-            Path(path).unlink()
-        except FileNotFoundError:
-            pass  # It didn't exist.
-
-    fh = logging.FileHandler(path)
-    LOGGER.addHandler(fh)
-    LOGGER.setLevel(logging.DEBUG)
-    LOGGER.info("Writing log to %s", path)
-
-
-def _log_to_console() -> None:
-    """Log to console."""
-    logging.basicConfig(level=logging.DEBUG)
-    LOGGER.info("Logging to console.")
+    stop_url = f"http://localhost:{port}/stop"
+    try:
+        requests.get(stop_url)
+    except requests.exceptions.ConnectionError:
+        LOGGER.error("Webmon: requests.exceptions.ConnectionError")
 
 
 def _create_napari_client(port: int):
@@ -223,27 +122,19 @@ def _create_napari_client(port: int):
     port : int
         The port number of the web server.
     """
-
-    def on_shutdown() -> None:
-        """Shutdown the web server.
-
-        This is called when NapariClient is shutting down. It shuts down
-        when it detects the napari it was connected to shuts down. So
-        we call our /stop endpoint to shutdown socketio.
-        """
-        stop_url = f"http://localhost:{port}/stop"
-        try:
-            requests.get(stop_url)
-        except requests.exceptions.ConnectionError:
-            LOGGER.error("Webmon: requests.exceptions.ConnectionError")
-
     if not CREATE_CLIENT:
+        LOGGER.error("NapariClient not created, CREATE_CLIENT=False.")
         return None
 
-    client = NapariClient.create(on_shutdown)
+    def _on_shutdown() -> None:
+        """Hit endpoint /stop."""
+        _notify_stop(port)
+
+    # Create the client.
+    client = NapariClient.create(_on_shutdown)
 
     if client is None:
-        LOGGER.error("NapariClient not created.")
+        LOGGER.error("NapariClient not created, no config file?")
 
     return client
 
@@ -260,10 +151,7 @@ def main(log_path: Optional[str], port: int) -> None:
     port : int
         Serve HTTP at this port.
     """
-    if log_path is not None:
-        _log_to_file(log_path)
-    else:
-        _log_to_console()
+    setup_logging(log_path)
 
     LOGGER.info("Webmon: Starting process %d", os.getpid())
     LOGGER.info("Webmon: args %s", sys.argv)
@@ -271,6 +159,10 @@ def main(log_path: Optional[str], port: int) -> None:
 
     global client
     client = _create_napari_client(port)
+
+    bridge = NapariBridge(socketio, client)
+
+    socketio.on_namespace(WebmonHandlers(bridge, '/test'))
 
     # socketio.run does not exit until our /stop endpoint is hit.
     socketio.run(
