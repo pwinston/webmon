@@ -33,6 +33,7 @@ class TileConfig {
 		this.levelShape = config.image_shape;
 		this.baseShape = config.base_shape;
 
+		this.maxTileDim = Math.max(this.tileShape[0], this.tileShape[1]);
 		this.maxLevelDim = Math.max(this.levelShape[0], this.levelShape[1]);
 	}
 }
@@ -126,10 +127,6 @@ function addToScene(object) {
 	internalParams.group.add(object);
 }
 
-function removeFromScene(object) {
-	internalParams.group.remove(object);
-}
-
 //
 // Draw a single thin line. 
 //
@@ -187,7 +184,6 @@ function createRect(rectColor, onTop = false) {
 		mesh.renderOrder = 10;
 	}
 
-	addToScene(mesh);
 	return mesh;
 }
 
@@ -200,6 +196,7 @@ function createTile(pos, size) {
 	// between COLOR_TILE_ON and COLOR_TILE_OFF depending on whether it was
 	// seen by the view.  
 	var mesh = createRect(COLOR_TILE_OFF);
+	internalParams.tileParent.add(mesh);
 
 	// Shrink it down a bit to create a small gap between tiles.
 	const rectSize = [
@@ -227,22 +224,23 @@ function createTiles() {
 	// Remove all the old ones for now, we could re-use them to minimize
 	// the number of mesh creations, but does it matter?
 	tileState.tiles.forEach(function (tile) {
-		removeFromScene(tile);
+		internalParams.tileParent.remove(tile);
 	})
 
 	// Start over with no tiles.
 	tileState.tiles = [];
 
-	const requestRows = tileConfig.tileShape[0];
-	const requestCols = tileConfig.tileShape[1];
+	const fullRows = tileConfig.tileShape[0];
+	const fullCols = tileConfig.tileShape[1];
 
-	console.log(`Request tiles ${requestRows} x ${requestCols}`);
+	console.log(`Full tile shape ${fullRows} x ${fullCols}`);
 
 	// MAX_DIM is a total hack to avoid huge grids. It takes too long to
 	// create huge grids plus they are too tiny to see anyway.
 	//
 	// MAX_DIM totally messes things up, but it least it doesn't hang.
 	const MAX_TILE_DIM = 50;
+	const bigLevel = tileConfig.maxTileDim >= MAX_TILE_DIM;
 
 	const rows = Math.min(tileConfig.tileShape[0], MAX_TILE_DIM);
 	const cols = Math.min(tileConfig.tileShape[1], MAX_TILE_DIM);
@@ -261,7 +259,7 @@ function createTiles() {
 	var x = 0;
 	var y = 0;
 
-	// Add in order so that index = row * cols + col
+	// Add tiles in the order such that index = row * cols + col.
 	for (let row = 0; row < rows; row++) {
 		for (let col = 0; col < cols; col++) {
 
@@ -368,6 +366,7 @@ function createViewer() {
 
 	if (SHOW_VIEW) {
 		tileState.view = createRect(COLOR_VIEW, true);
+		addToScene(tileState.view);
 	}
 
 	if (SHOW_TILES) {
