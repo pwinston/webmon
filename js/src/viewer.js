@@ -16,22 +16,16 @@ import {
 	initScene,
 } from './utils.js';
 
-// Draw the axes (red=X green=Y).
-const SHOW_AXES = true;
-
-// Draw the tiles themselves.
-const SHOW_TILES = true;
-
-// Draw the rect depicting Napari's current view frustum.
-const SHOW_VIEW = true;
+const SHOW_AXES = true;  // Draw the axes (red=X green=Y).
+const SHOW_TILES = true;  // Draw the tiles themselves.
+const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
 class TileConfig {
 	constructor(config) {
 		this.config = config;  // The config from napari.
 
-		// Pull all these out not just to change the case of the variables,
-		// but because these names make more sense. We might change the
-		// napari message to match.
+		// Use better names. We should update napari to use these names
+		// (although keep the Python word_case).
 		this.levelIndex = config.level_index;;
 		this.tileSize = config.tile_size;
 
