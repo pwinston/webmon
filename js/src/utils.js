@@ -18,17 +18,6 @@ export function defineExternalParams() {
 	};
 }
 
-export var tileConfig;
-export function defineTileConfig() {
-	tileConfig = new function () {
-		this.rows = 0;
-		this.cols = 0;
-
-		// The full base image shape, might be huge like (100000, 100000).
-		this.baseShape = 0;
-	};
-}
-
 export var tileState;
 export function defineTileState() {
 	tileState = new function () {

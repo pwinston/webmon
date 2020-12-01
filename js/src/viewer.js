@@ -9,8 +9,6 @@ import { GUI } from 'dat.gui';
 import {
 	externalParams,
 	defineExternalParams,
-	tileConfig,
-	defineTileConfig,
 	tileState,
 	defineTileState,
 	internalParams,
@@ -27,21 +25,50 @@ const SHOW_TILES = true;
 // Draw the rect depicting Napari's current view frustum.
 const SHOW_VIEW = true;
 
+// TODO: get rid of all these accessors once napari message is
+// improved to have better named keys.
+class TileConfig {
+	constructor(config) {
+		this.config = config;  // The config from napari.
+
+		// Pull all these out not just to change the case of the variables,
+		// but because these names make more sense. We might change the
+		// napari message to match.
+		this.levelIndex = config.level_index;;
+		this.numTileRows = config.shape_in_tiles[0];
+		this.tileSize = config.tile_size;
+
+		this.numTileRows = config.shape_in_tiles[0];
+		this.numTileCols = config.shape_in_tiles[1];
+
+		this.numLevelRows = config.image_shape[0];
+		this.numLevelCols = config.image_shape[1];
+		this.maxLevelDim = Math.max(this.numLevelRows, this.numLevelCols);
+
+		this.numBaseRows = config.base_shape[0];
+		this.numBaseCols = config.base_shape[1];
+	}
+}
+
+// Initialize to a (1 x 1) grid of tiles, just to have something to draw
+// until we get real data.
+var tileConfig = new TileConfig({
+	base_shape: [256, 256],
+	image_shape: [256, 256],
+	shape_in_tiles: [1, 1],
+	tile_size: 256,
+	level_index: 0
+})
 
 function setTileConfig(config) {
 
 	if (!config)
 		return
 
-	const newRows = parseInt(config.shape_in_tiles[0]);
-	const newCols = parseInt(config.shape_in_tiles[1]);
-
-	// Only create tiles if this is a new config, creating tiles
-	// is more expensive than just updating their colors.
-	if (tileConfig.rows != newRows || tileConfig.cols != newCols) {
-		tileConfig.rows = newRows;
-		tileConfig.cols = newCols;
-		tileConfig.baseShape = config.base_shape;
+	// Only create tiles if level changed. Because toggling colors is cheaper
+	// then creating new tiles, so only create if needed.
+	if (!tileConfig || tileConfig.levelIndex != config['level_index']) {
+		tileConfig = new TileConfig(config);
 
 		if (SHOW_TILES) {
 			createTiles();
@@ -64,7 +91,7 @@ function setTileState(state) {
 // webmon sent us a set_tile_data message
 //
 function setTileData(msg) {
-	console.log("setTileData", msg)
+	//console.log("setTileData", msg)
 	setTileConfig(msg.tile_config)
 	setTileState(msg.tile_state)
 }
@@ -104,7 +131,10 @@ const COLOR_TILE_OFF = 0xa3a2a0; // gray
 const COLOR_TILE_ON = 0xE11313;  // red
 const COLOR_VIEW = 0xF5C542; // yellow
 
-const TILE_GAP = 0.1; // fraction of the tile size
+// In a way the tiles are all full size with zero gaps between them,
+// but we draw the tiles a bit smaller so it looks like there is gap,
+// which just makes it easier to see them as individual tiles.
+const TILE_GAP = 0.05;
 
 function addToScene(object) {
 	internalParams.group.add(object);
@@ -170,26 +200,30 @@ function createRect(rectColor, onTop = false) {
 	return mesh;
 }
 
+//
+// Create and return one tile, a rectangular mesh. 
+//
+function createTile(pos, size) {
 
-//
-// Create one tile mesh, later we toggle the color
-//
-function createTile(row, col, tileSize) {
+	// Start as COLOR_TILE_OFF, later in updateTileColors() we toggle it
+	// between COLOR_TILE_ON and COLOR_TILE_OFF depending on whether it was
+	// seen by the view.  
 	var mesh = createRect(COLOR_TILE_OFF);
 
-	const rectSize = tileSize - (TILE_GAP * tileSize);
+	// Shrink it down a bit to create a small gap between tiles.
+	const rectSize = [
+		size[0] - (TILE_GAP * size[0]),
+		size[1] - (TILE_GAP * size[1])
+	];
 
-	const scale = [rectSize, rectSize];
-	mesh.scale.set(...scale);
+	// Default rect is size [-0.5 .. 0.5] with [0, 0] center. So we move it
+	// by rectSize/2 since we want our tile's corner to be at the given
+	// coordinates, not its center.
+	mesh.position.x = pos[0] + rectSize[0] / 2;
+	mesh.position.y = pos[1] + rectSize[1] / 2;
 
-	// Default rect is [-0.5 .. 0.5] with [0, 0] center. We move it
-	// by half since we want our tile's corner to be at the given
-	// coordinates.
-	// 
-	const half = rectSize / 2;
-
-	mesh.position.x = col * tileSize + half;
-	mesh.position.y = row * tileSize + half;
+	// Scale to size it correctly.
+	mesh.scale.set(...rectSize);
 
 	return mesh;
 }
@@ -199,7 +233,8 @@ function createTile(row, col, tileSize) {
 //
 function createTiles() {
 
-	// Remove all the old ones for now.
+	// Remove all the old ones for now, we could re-use them to minimize
+	// the number of mesh creations, but does it matter?
 	tileState.tiles.forEach(function (tile) {
 		removeFromScene(tile);
 	})
@@ -207,47 +242,88 @@ function createTiles() {
 	// Start over with no tiles.
 	tileState.tiles = [];
 
-	var rows = tileConfig.rows
-	var cols = tileConfig.cols;
+	const requestRows = tileConfig.numTileRows;
+	const requestCols = tileConfig.numTileCols;
 
-	const tileSize = 1 / rows;
+	console.log(`Request tiles ${requestRows} x ${requestCols}`);
+
+	// MAX_DIM is a total hack to avoid huge grids. It takes too long to
+	// create huge grids plus they are too tiny to see anyway.
+	//
+	// MAX_DIM totally messes things up, but it least it doesn't hang.
+	const MAX_TILE_DIM = 50;
+
+	const rows = Math.min(tileConfig.numTileRows, MAX_TILE_DIM);
+	const cols = Math.min(tileConfig.numTileCols, MAX_TILE_DIM);
+	const tileSize = tileConfig.tileSize;
+
+	// Use longer dimension so it fits in our [0..1] space. 
+	const maxLevelDim = tileConfig.maxLevelDim;
 
 	console.log(`Create tiles ${rows} x ${cols}`);
+
+	const levelRows = tileConfig.numLevelRows;
+	const levelCols = tileConfig.numLevelCols;
+
+	// Track tile's position in level pixels, so we know if we need a
+	// partial tile at the end of a row or column.
+	var x = 0;
+	var y = 0;
 
 	// Add in order so that index = row * cols + col
 	for (let row = 0; row < rows; row++) {
 		for (let col = 0; col < cols; col++) {
-			const tile = createTile(row, col, tileSize)
-			tileState.tiles.push(tile);
+
+			// Size in [0..1] coordinates. Interior tiles are always
+			// (tileSize x tileSize) but edge tiles or the corner tile
+			// might be smaller.
+			const size = [
+				Math.min(tileSize, levelCols - x) / maxLevelDim,
+				Math.min(tileSize, levelRows - y) / maxLevelDim
+			];
+
+			// Position in [0..1] coordinates.
+			const pos = [x / maxLevelDim, y / maxLevelDim];
+
+			// Create and add the tile.			
+			tileState.tiles.push(createTile(pos, size));
+			x += tileSize;
 		}
+
+		// Starting a new row.
+		x = 0;
+		y += tileSize;
 	}
 }
 
 //
-// Move the view rect to the current position/size.
+// Move the view rect to the current position/size. We move it because
+// maybe it's a bit faster than create a new rect every frame?
 //
 function moveView() {
-	const baseX = tileConfig.baseShape[1];
-	const baseY = tileConfig.baseShape[0];
+	const baseX = tileConfig.numBaseCols;
+	const baseY = tileConfig.numBaseRows;
 
-	const x0 = tileState.corners[0][1] / baseX;
-	const y0 = tileState.corners[0][0] / baseY;
-	const x1 = tileState.corners[1][1] / baseX;
-	const y1 = tileState.corners[1][0] / baseY;
+	const bigger = Math.max(baseX, baseY)
+
+	const x0 = tileState.corners[0][1] / bigger;
+	const y0 = tileState.corners[0][0] / bigger;
+	const x1 = tileState.corners[1][1] / bigger;
+	const y1 = tileState.corners[1][0] / bigger;
 
 	const width = x1 - x0;
 	const height = y1 - y0;
 
+	// pos is the *center* of the rectangle so offset it by half the
+	// height/width.
 	const pos = [x0 + width / 2, y0 + height / 2];
 	const scale = [width, height];
-
-	console.log(x0, y0);
 
 	moveViewRect(pos, scale)
 }
 
 function moveViewRect(pos, scale) {
-	console.log("moveViewRect: ", pos, scale);
+	//console.log("moveViewRect: ", pos, scale);
 	tileState.view.scale.set(...scale);
 	tileState.view.position.x = pos[0];
 	tileState.view.position.y = pos[1];
@@ -255,8 +331,8 @@ function moveViewRect(pos, scale) {
 }
 
 function updateTileColors() {
-	var rows = tileConfig.rows;
-	var cols = tileConfig.cols;
+	var rows = tileConfig.numTileRows;
+	var cols = tileConfig.numTileCols;
 
 	var seenMap = new Map();
 
@@ -268,9 +344,7 @@ function updateTileColors() {
 		seenMap.set(index, 1);
 	});
 
-	console.log("Drawing ", seenMap.size);
-
-	// Set the colors of all the tiles.
+	// Update the colors of all the tiles.
 	for (let row = 0; row < rows; row++) {
 		for (let col = 0; col < cols; col++) {
 			const index = row * cols + col;
@@ -287,8 +361,9 @@ function updateTiles() {
 		updateTileColors();
 	}
 
-	if (SHOW_VIEW)
+	if (SHOW_VIEW) {
 		moveView();
+	}
 }
 
 // 
@@ -355,7 +430,6 @@ export function startViewer() {
 	defineExternalParams();
 
 	defineTileState();
-	defineTileConfig();
 
 	initScene();
 	createGUI();
