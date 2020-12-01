@@ -25,8 +25,6 @@ const SHOW_TILES = true;
 // Draw the rect depicting Napari's current view frustum.
 const SHOW_VIEW = true;
 
-// TODO: get rid of all these accessors once napari message is
-// improved to have better named keys.
 class TileConfig {
 	constructor(config) {
 		this.config = config;  // The config from napari.
@@ -132,8 +130,7 @@ const COLOR_TILE_ON = 0xE11313;  // red
 const COLOR_VIEW = 0xF5C542; // yellow
 
 // In a way the tiles are all full size with zero gaps between them,
-// but we draw the tiles a bit smaller so it looks like there is gap,
-// which just makes it easier to see them as individual tiles.
+// but we draw the tiles a bit smaller so it looks like there are gaps.
 const TILE_GAP = 0.05;
 
 function addToScene(object) {
@@ -144,6 +141,12 @@ function removeFromScene(object) {
 	internalParams.group.remove(object);
 }
 
+//
+// Draw a single thin line. 
+//
+// All lines are one pixel wide. There is a line width option but docs say
+// it does nothing in most renderers. And it seemed to do nothing for us.
+//
 function drawLine(start, end, color) {
 	const points = [];
 	points.push(new THREE.Vector2(...start));
@@ -157,6 +160,10 @@ function drawLine(start, end, color) {
 	addToScene(line);
 }
 
+//
+// Red line for X axis which is left to right.
+// Green line for Y axis which is top to bottom.
+//
 function createAxes() {
 	const depth = -1;
 	const origin = [0, 0, depth];
@@ -190,11 +197,6 @@ function createRect(rectColor, onTop = false) {
 		material.depthTest = false;
 		mesh.renderOrder = 10;
 	}
-
-	// Defaults to all zeros? Lets be explicit for now.
-	mesh.position.x = 0;
-	mesh.position.y = 0;
-	mesh.position.z = 0;
 
 	addToScene(mesh);
 	return mesh;
