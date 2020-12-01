@@ -83,7 +83,7 @@ class NapariClient(Thread):
     environment variable. That contains a port number to connect to.
     We connect our SharedMemoryManager to that port.
 
-    See components.experimental.monitor._api for documention on the 
+    See components.experimental.monitor._api.py for documention on the
     shared resources that napari exposes.
     """
 
