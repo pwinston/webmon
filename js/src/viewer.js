@@ -9,8 +9,6 @@ import { GUI } from 'dat.gui';
 import {
 	externalParams,
 	defineExternalParams,
-	tileState,
-	defineTileState,
 	internalParams,
 	defineInternalParams,
 	initScene,
@@ -21,32 +19,62 @@ const SHOW_TILES = true;  // Draw the tiles themselves.
 const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
 class TileConfig {
-	constructor(config) {
-		this.config = config;  // The config from napari.
+	constructor(message) {
+		this.message = message;  // The config from napari.
 
 		// Use better names. We should update napari to use these names
 		// (although keep the Python word_case).
-		this.levelIndex = config.level_index;;
-		this.tileSize = config.tile_size;
+		this.levelIndex = message.level_index;;
+		this.tileSize = message.tile_size;
 
-		this.tileShape = config.shape_in_tiles;
-		this.levelShape = config.image_shape;
-		this.baseShape = config.base_shape;
+		this.tileShape = message.shape_in_tiles;
+		this.levelShape = message.image_shape;
+		this.baseShape = message.base_shape;
 
 		this.maxTileDim = Math.max(this.tileShape[0], this.tileShape[1]);
 		this.maxLevelDim = Math.max(this.levelShape[0], this.levelShape[1]);
 	}
 }
 
-// Initialize to a (1 x 1) grid of tiles, just to have something to draw
-// until we get real data.
+class TileState {
+	constructor(message) {
+		this.message = message;  // The state from napari.
+	};
+}
+
+class Grid {
+	constructor() {
+		this.tiles = [];
+		this.view = null;
+	};
+
+	update() {
+		if (SHOW_TILES) {
+			updateTileColors();
+		}
+
+		if (SHOW_VIEW) {
+			moveView();
+		}
+	}
+}
+
+var grid = new Grid();
+
+// Create with defaults in case we draw before getting any data.
 var tileConfig = new TileConfig({
 	base_shape: [256, 256],
 	image_shape: [256, 256],
 	shape_in_tiles: [1, 1],
 	tile_size: 256,
-	level_index: 0
-})
+	level_index: null  // so we update it with the real tileConfig
+});
+
+// Create with defaults in case we draw before getting any data.
+var tileState = new TileState({
+	seen: [],
+	corners: [[0, 0], [1, 1]]
+});
 
 function setTileConfig(config) {
 
@@ -68,10 +96,10 @@ function setTileState(state) {
 	if (!state)
 		return
 
-	tileState.seen = state.seen;
-	tileState.corners = state.corners;
+	tileState = new TileState(state);
+
 	if (SHOW_TILES) {
-		updateTiles();
+		grid.update();
 	}
 }
 
@@ -79,7 +107,6 @@ function setTileState(state) {
 // webmon sent us a set_tile_data message
 //
 function setTileData(msg) {
-	//console.log("setTileData", msg)
 	setTileConfig(msg.tile_config)
 	setTileState(msg.tile_state)
 }
@@ -220,15 +247,14 @@ function createTile(pos, size) {
 // Create all the tiles meshes, in the current grid size.
 //
 function createTiles() {
-
 	// Remove all the old ones for now, we could re-use them to minimize
 	// the number of mesh creations, but does it matter?
-	tileState.tiles.forEach(function (tile) {
+	grid.tiles.forEach(function (tile) {
 		internalParams.tileParent.remove(tile);
 	})
 
 	// Start over with no tiles.
-	tileState.tiles = [];
+	grid.tiles = [];
 
 	const fullRows = tileConfig.tileShape[0];
 	const fullCols = tileConfig.tileShape[1];
@@ -275,7 +301,8 @@ function createTiles() {
 			const pos = [x / maxLevelDim, y / maxLevelDim];
 
 			// Create and add the tile.			
-			tileState.tiles.push(createTile(pos, size));
+			const index = row * cols + col;
+			grid.tiles.push(createTile(pos, size));
 			x += tileSize;
 		}
 
@@ -293,12 +320,13 @@ function moveView() {
 	const baseX = tileConfig.baseShape[1];
 	const baseY = tileConfig.baseShape[0];
 
-	const bigger = Math.max(baseX, baseY)
+	const maxDim = Math.max(baseX, baseY)
 
-	const x0 = tileState.corners[0][1] / bigger;
-	const y0 = tileState.corners[0][0] / bigger;
-	const x1 = tileState.corners[1][1] / bigger;
-	const y1 = tileState.corners[1][0] / bigger;
+	const corners = tileState.message.corners;
+	const x0 = corners[0][1] / maxDim;
+	const y0 = corners[0][0] / maxDim;
+	const x1 = corners[1][1] / maxDim;
+	const y1 = corners[1][0] / maxDim;
 
 	const width = x1 - x0;
 	const height = y1 - y0;
@@ -312,13 +340,15 @@ function moveView() {
 }
 
 function moveViewRect(pos, scale) {
-	//console.log("moveViewRect: ", pos, scale);
-	tileState.view.scale.set(...scale);
-	tileState.view.position.x = pos[0];
-	tileState.view.position.y = pos[1];
-	tileState.view.position.z = 0;
+	grid.view.scale.set(...scale);
+	grid.view.position.x = pos[0];
+	grid.view.position.y = pos[1];
+	grid.view.position.z = 0;
 }
 
+//
+// Update the color of all tiles. Red if seen, otherwise gray.
+//
 function updateTileColors() {
 	var rows = tileConfig.tileShape[0];
 	var cols = tileConfig.tileShape[1];
@@ -326,7 +356,7 @@ function updateTileColors() {
 	var seenMap = new Map();
 
 	// Populate seen_map so we can set the colors based on it.
-	tileState.seen.forEach(function (coords) {
+	tileState.message.seen.forEach(function (coords) {
 		const row = parseInt(coords[0]);
 		const col = parseInt(coords[1]);
 		const index = row * cols + col;
@@ -338,20 +368,8 @@ function updateTileColors() {
 		for (let col = 0; col < cols; col++) {
 			const index = row * cols + col;
 			const color = seenMap.has(index) ? COLOR_TILE_ON : COLOR_TILE_OFF;
-			tileState.tiles[index].material.color.set(color);
+			grid.tiles[index].material.color.set(color);
 		}
-	}
-}
-//
-// Draw the tiles (just set the colors right now).
-//
-function updateTiles() {
-	if (SHOW_TILES) {
-		updateTileColors();
-	}
-
-	if (SHOW_VIEW) {
-		moveView();
 	}
 }
 
@@ -365,8 +383,9 @@ function createViewer() {
 
 
 	if (SHOW_VIEW) {
-		tileState.view = createRect(COLOR_VIEW, true);
-		addToScene(tileState.view);
+		console.log("createView");
+		grid.view = createRect(COLOR_VIEW, true);
+		addToScene(grid.view);
 	}
 
 	if (SHOW_TILES) {
@@ -418,8 +437,6 @@ export function startViewer() {
 
 	defineInternalParams();
 	defineExternalParams();
-
-	defineTileState();
 
 	initScene();
 	createGUI();

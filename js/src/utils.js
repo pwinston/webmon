@@ -18,17 +18,6 @@ export function defineExternalParams() {
 	};
 }
 
-export var tileState;
-export function defineTileState() {
-	tileState = new function () {
-		this.seen = [];
-		this.corners = [[0, 0], [1, 1]];
-		this.normalized = [];
-		this.tiles = [];
-		this.view = [];
-	};
-}
-
 export var internalParams;
 export function defineInternalParams() {
 	internalParams = new function () {
