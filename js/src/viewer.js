@@ -50,7 +50,7 @@ class Grid {
 
 	update() {
 		if (SHOW_TILES) {
-			updateTileColors();
+			updateSeen();
 		}
 
 		if (SHOW_VIEW) {
@@ -219,7 +219,7 @@ function createRect(rectColor, onTop = false) {
 //
 function createTile(pos, size) {
 
-	// Start as COLOR_TILE_OFF, later in updateTileColors() we toggle it
+	// Start as COLOR_TILE_OFF, later in updateSeen() we toggle it
 	// between COLOR_TILE_ON and COLOR_TILE_OFF depending on whether it was
 	// seen by the view.  
 	var mesh = createRect(COLOR_TILE_OFF);
@@ -349,7 +349,7 @@ function moveViewRect(pos, scale) {
 //
 // Update the color of all tiles. Red if seen, otherwise gray.
 //
-function updateTileColors() {
+function updateSeen() {
 	var rows = tileConfig.tileShape[0];
 	var cols = tileConfig.tileShape[1];
 
