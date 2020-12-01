@@ -33,18 +33,13 @@ class TileConfig {
 		// but because these names make more sense. We might change the
 		// napari message to match.
 		this.levelIndex = config.level_index;;
-		this.numTileRows = config.shape_in_tiles[0];
 		this.tileSize = config.tile_size;
 
-		this.numTileRows = config.shape_in_tiles[0];
-		this.numTileCols = config.shape_in_tiles[1];
+		this.tileShape = config.shape_in_tiles;
+		this.levelShape = config.image_shape;
+		this.baseShape = config.base_shape;
 
-		this.numLevelRows = config.image_shape[0];
-		this.numLevelCols = config.image_shape[1];
-		this.maxLevelDim = Math.max(this.numLevelRows, this.numLevelCols);
-
-		this.numBaseRows = config.base_shape[0];
-		this.numBaseCols = config.base_shape[1];
+		this.maxLevelDim = Math.max(this.levelShape[0], this.levelShape[1]);
 	}
 }
 
@@ -244,8 +239,8 @@ function createTiles() {
 	// Start over with no tiles.
 	tileState.tiles = [];
 
-	const requestRows = tileConfig.numTileRows;
-	const requestCols = tileConfig.numTileCols;
+	const requestRows = tileConfig.tileShape[0];
+	const requestCols = tileConfig.tileShape[1];
 
 	console.log(`Request tiles ${requestRows} x ${requestCols}`);
 
@@ -255,8 +250,8 @@ function createTiles() {
 	// MAX_DIM totally messes things up, but it least it doesn't hang.
 	const MAX_TILE_DIM = 50;
 
-	const rows = Math.min(tileConfig.numTileRows, MAX_TILE_DIM);
-	const cols = Math.min(tileConfig.numTileCols, MAX_TILE_DIM);
+	const rows = Math.min(tileConfig.tileShape[0], MAX_TILE_DIM);
+	const cols = Math.min(tileConfig.tileShape[1], MAX_TILE_DIM);
 	const tileSize = tileConfig.tileSize;
 
 	// Use longer dimension so it fits in our [0..1] space. 
@@ -264,8 +259,8 @@ function createTiles() {
 
 	console.log(`Create tiles ${rows} x ${cols}`);
 
-	const levelRows = tileConfig.numLevelRows;
-	const levelCols = tileConfig.numLevelCols;
+	const levelRows = tileConfig.levelShape[0];
+	const levelCols = tileConfig.levelShape[1];
 
 	// Track tile's position in level pixels, so we know if we need a
 	// partial tile at the end of a row or column.
@@ -303,8 +298,8 @@ function createTiles() {
 // maybe it's a bit faster than create a new rect every frame?
 //
 function moveView() {
-	const baseX = tileConfig.numBaseCols;
-	const baseY = tileConfig.numBaseRows;
+	const baseX = tileConfig.baseShape[1];
+	const baseY = tileConfig.baseShape[0];
 
 	const bigger = Math.max(baseX, baseY)
 
@@ -333,8 +328,8 @@ function moveViewRect(pos, scale) {
 }
 
 function updateTileColors() {
-	var rows = tileConfig.numTileRows;
-	var cols = tileConfig.numTileCols;
+	var rows = tileConfig.tileShape[0];
+	var cols = tileConfig.tileShape[1];
 
 	var seenMap = new Map();
 
