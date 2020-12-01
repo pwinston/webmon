@@ -9,7 +9,7 @@ import os
 import threading
 import time
 from multiprocessing.managers import SharedMemoryManager
-from queue import Queue
+from queue import Empty, Queue
 from threading import Event, Thread
 from typing import Callable, NamedTuple, Optional
 
@@ -23,15 +23,30 @@ BUFFER_SIZE = 1024 * 1024
 LOG_DATA_FROM_NAPARI = False
 
 # TBD what is a good poll interval is.
-POLL_INTERVAL_MS = 100
+POLL_INTERVAL_MS = 16.7
+POLL_INTERVAL_SECONDS = POLL_INTERVAL_MS / 1000
+
+# Right now we just need to magically know these callback names,
+# maybe we can come up with a better way.
+NAPARI_API = ['napari_shutting_down', 'commands', 'client_messages', 'data']
 
 
-class SharedResources(NamedTuple):
+class NapariRemoteAPI(NamedTuple):
     """Napari exposes these shared resources."""
 
-    shutdown: Optional[Event] = None
-    commands: Optional[Queue] = None
-    data: Optional[dict] = None
+    napari_shutting_down: Event
+    commands: Queue
+    client_messages: Queue
+    data: dict
+
+    @classmethod
+    def from_manager(cls, manager):
+        return cls(
+            manager.napari_shutting_down(),
+            manager.commands(),
+            manager.client_messages(),
+            manager.data(),
+        )
 
 
 def _get_client_config() -> dict:
@@ -68,21 +83,8 @@ class NapariClient(Thread):
     environment variable. That contains a port number to connect to.
     We connect our SharedMemoryManager to that port.
 
-    We get these resources from the manager:
-
-    1) shutdown_event()
-
-    If this is set napari is exiting. Ususally it exists so fast we get
-    at ConnectionResetError exception instead of see this was set. We have
-    no clean way to exit the SocketIO server yet.
-
-    2) command_queue()
-
-    We put command onto this queue for napari to execute.
-
-    3) data()
-
-    Data from napari's monitor.add() command.
+    See components.experimental.monitor._api.py for documention on the
+    shared resources that napari exposes.
     """
 
     def __init__(self, config: dict, on_shutdown: Callable[[], None]):
@@ -90,6 +92,7 @@ class NapariClient(Thread):
         assert config
         self.config = config
         self.on_shutdown = on_shutdown
+        self.running = False
 
         self.napari_data = {}
 
@@ -100,10 +103,7 @@ class NapariClient(Thread):
         server_port = config['server_port']
         LOGGER.info("NapariClient: connecting to port %d.", server_port)
 
-        # Right now we just need to magically know these callback names,
-        # maybe we can come up with a better way.
-        napari_api = ['shutdown_event', 'command_queue', 'data']
-        for name in napari_api:
+        for name in NAPARI_API:
             SharedMemoryManager.register(name)
 
         # Connect to napari's shared memory.
@@ -114,38 +114,34 @@ class NapariClient(Thread):
         self._manager.connect()
 
         # Get the shared resources.
-        self._shared = SharedResources(
-            self._manager.shutdown_event(),
-            self._manager.command_queue(),
-            self._manager.data(),
-        )
+        self._remote = NapariRemoteAPI.from_manager(self._manager)
 
-        # Start our thread so we can poll napari.
+        # Start our thread which will poll napari.
         self.start()
 
     def run(self) -> None:
         """Thread that communicates with napari."""
 
+        self.running = True
         tid = threading.get_ident()
         LOGGER.info("NapariClient: thread %d started.", tid)
-
-        poll_interval_seconds = POLL_INTERVAL_MS / 1000
 
         while True:
             try:
                 if not self._poll():
-                    break  # Exit thread.
+                    break  # Shutdown event, exit the thread.
             except ConnectionResetError:
                 LOGGER.info("NapariClient: ConnectionResetError.")
-                break  # Exit thread.
+                break  # Napari must have exited, so exit the thread.
 
             # Sleep until ready to poll again.
-            time.sleep(poll_interval_seconds)
+            time.sleep(POLL_INTERVAL_SECONDS)
 
         LOGGER.info("NapariClient: thread %d is exiting.", tid)
 
         # Notify webmon that we shutdown.
         self.on_shutdown()
+        self.running = False
 
     def _poll(self) -> bool:
         """Process data to/from napari.
@@ -167,16 +163,18 @@ class NapariClient(Thread):
         both napari and the client would have the chance to do some
         final cleanup.
         """
-        if self._shared.shutdown.is_set():
+        if self._remote.napari_shutting_down.is_set():
             LOGGER.info("NapariClient: napari signaled shutdown.")
             return False  # Stop polling.
 
         # Do we need to copy here? Otherwise are we referring directly to
-        # the version in shared memory? That might change out from under
-        # us, but as long it does so safely, maybe that's okay?
+        # the version in shared memory? That might might be good: no
+        # copy unless we really reference the data? But could it change out
+        # from under us? Do we care as long as it's done safely, we get
+        # the latest?
         self.napari_data['tile_data'] = {
-            "tile_config": self._shared.data.get('tile_config'),
-            "tile_state": self._shared.data.get('tile_state'),
+            "tile_config": self._remote.data.get('tile_config'),
+            "tile_state": self._remote.data.get('tile_state'),
         }
 
         if LOG_DATA_FROM_NAPARI:
@@ -192,9 +190,39 @@ class NapariClient(Thread):
 
         try:
             # Put on the shared command queue.
-            self._shared.commands.put(command)
+            self._remote.commands.put(command)
         except ConnectionRefusedError:
-            self._log("NapariClient: ConnectionRefusedError")
+            LOGGER.error("NapariClient.send_command: ConnectionRefusedError")
+
+    def get_napari_message(self) -> dict:
+        """Get one message from napari.
+
+        Return
+        ------
+        dict
+            The message.
+        """
+        if not self.running:
+            return None  # Cannot get message from napari.
+
+        try:
+            while True:
+                try:
+                    LOGGER.info("Getting remote messages")
+                    message = self._remote.client_messages.get_nowait()
+                except ConnectionResetError:
+                    LOGGER.error(
+                        "NapariClient.get_napari_message: ConnectionResetError"
+                    )
+                    return None
+
+                assert isinstance(message, dict)  # For now.
+                LOGGER.info(
+                    "NapariClient.get_napari_message: %s", json.dumps(message)
+                )
+                return message
+        except Empty:
+            return None  # No more messages.
 
     @classmethod
     def create(cls, on_shutdown: Callable[[], None]):

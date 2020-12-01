@@ -2,6 +2,7 @@
 
 Communicates between the Flask-SocketIO app and the NapariClient.
 """
+import json
 import logging
 from queue import Empty, Queue
 from threading import Thread, get_ident
@@ -12,11 +13,27 @@ from napari_client import NapariClient
 
 LOGGER = logging.getLogger("webmon")
 
-# Number of seconds between sending/receiving data.
-POLL_INTERVAL_MS = 100
+# Number of milliseconds between sending/receiving data.
+POLL_INTERVAL_MS = 16.7
+POLL_INTERVAL_SECONDS = POLL_INTERVAL_MS / 1000
 
 
 class NapariBridge:
+    """Bridge between webmon and NapariClient.
+
+    Parameters
+    ----------
+    socketio : SocketIO
+        The main SocketIO instance.
+    client : NapariClient
+        The client that's talking to napari.
+
+    Attributes
+    ----------
+    commands : Queue
+        set_command() puts command into this queue.
+    """
+
     def __init__(self, socketio: SocketIO, client: NapariClient):
         self.socketio = socketio
         self.client = client
@@ -32,25 +49,24 @@ class NapariBridge:
 
     def _task(self) -> None:
         """Send data to/from the viewer and napari."""
-        poll_seconds = POLL_INTERVAL_MS / 1000
         tid = get_ident()
         LOGGER.info("Webmon: Background task thread_id=%d", tid)
 
         while True:
             # LOGGER.info("Sleeping %f", poll_seconds)
-            self.socketio.sleep(poll_seconds)
-
-            if self.client is None:
-                continue
+            self.socketio.sleep(POLL_INTERVAL_SECONDS)
 
             self._send_commands()  # Send any pending commands.
 
-            # We just send the whole thing every time. We could potentially
-            # only send if the data had changed since the last time
-            # we sent it. To cut down the spamming viewer with repeated
-            # data.
-            tile_data = self.client.napari_data['tile_data']
-            self.socketio.emit('set_tile_data', tile_data, namespace='/test')
+            # We just send the whole thing every time right now. Need
+            # a good way to avoid sending redundant/identical data.
+            if self.client is not None:
+                tile_data = self.client.napari_data['tile_data']
+                self.socketio.emit(
+                    'set_tile_data', tile_data, namespace='/test'
+                )
+
+            self._process_messages()
 
     def _send_commands(self) -> None:
         """Send all pending commands."""
@@ -58,6 +74,25 @@ class NapariBridge:
             try:
                 command = self.commands.get_nowait()
             except Empty:
-                break  # No more commands to end.
-            LOGGER.info("Send command to napari: %s", command)
-            self.client.send_command(command)
+                break  # No more commands to send.
+
+            if self.client is None:
+                LOGGER.info("Send Command (no client): %s", command)
+            else:
+                self.client.send_command(command)
+
+    def _process_messages(self) -> None:
+        while True:
+            message = self.client.get_napari_message()
+
+            if message is None:
+                return  # No more messages.
+
+            try:
+                data = message['load']
+                LOGGER.info("send_load_data: %s", json.dumps(data))
+                self.socketio.emit('send_load_data', data, namespace='/test')
+            except KeyError:
+                LOGGER.info(
+                    "Ignoring unknown message: %s", json.dumps(message)
+                )
