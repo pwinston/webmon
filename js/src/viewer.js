@@ -39,12 +39,22 @@ class TileConfig {
 class TileState {
 	constructor(message) {
 		this.message = message;  // The state from napari.
+		var seenMap = new Map();
+
+		this.message.seen.forEach(function (coord) {
+			// Map keys can't really be arrays, so use a string.
+			const coord_str = coord.join(',');
+			seenMap.set(coord_str, 1);
+		});
+
+		// seenMap is used later on to set the colors of the tiles.
+		this.seenMap = seenMap;
 	};
 }
 
 class Grid {
 	constructor() {
-		this.tiles = [];
+		this.tiles = new Map();
 		this.view = null;
 	};
 
@@ -76,39 +86,25 @@ var tileState = new TileState({
 	corners: [[0, 0], [1, 1]]
 });
 
-function setTileConfig(config) {
-
-	if (!config)
-		return
+//
+// webmon sent us some data.
+//
+function setTileData(msg) {
+	tileState = new TileState(msg.tile_state);
 
 	// Only create tiles if level changed. Because toggling colors is cheaper
-	// then creating new tiles, so only create if needed.
-	if (!tileConfig || tileConfig.levelIndex != config['level_index']) {
-		tileConfig = new TileConfig(config);
+	// then creating new tiles, so only create tiles if needed.
+	if (!tileConfig || tileConfig.levelIndex != msg.tile_config['level_index']) {
+		tileConfig = new TileConfig(msg.tile_config);
 
 		if (SHOW_TILES) {
 			createTiles();
 		}
 	}
-}
-
-function setTileState(state) {
-	if (!state)
-		return
-
-	tileState = new TileState(state);
 
 	if (SHOW_TILES) {
 		grid.update();
 	}
-}
-
-//
-// webmon sent us a set_tile_data message
-//
-function setTileData(msg) {
-	setTileConfig(msg.tile_config)
-	setTileState(msg.tile_state)
 }
 
 // References:
@@ -254,7 +250,7 @@ function createTiles() {
 	})
 
 	// Start over with no tiles.
-	grid.tiles = [];
+	grid.tiles = new Map();
 
 	const fullRows = tileConfig.tileShape[0];
 	const fullCols = tileConfig.tileShape[1];
@@ -301,8 +297,8 @@ function createTiles() {
 			const pos = [x / maxLevelDim, y / maxLevelDim];
 
 			// Create and add the tile.			
-			const index = row * cols + col;
-			grid.tiles.push(createTile(pos, size));
+			const coord_str = [row, col].join(',');
+			grid.tiles.set(coord_str, createTile(pos, size));
 			x += tileSize;
 		}
 
@@ -350,25 +346,19 @@ function moveViewRect(pos, scale) {
 // Update the color of all tiles. Red if seen, otherwise gray.
 //
 function updateSeen() {
+	// internalParams.tileParent.position.x = -0.5;
+
 	var rows = tileConfig.tileShape[0];
 	var cols = tileConfig.tileShape[1];
-
-	var seenMap = new Map();
-
-	// Populate seen_map so we can set the colors based on it.
-	tileState.message.seen.forEach(function (coords) {
-		const row = parseInt(coords[0]);
-		const col = parseInt(coords[1]);
-		const index = row * cols + col;
-		seenMap.set(index, 1);
-	});
 
 	// Update the colors of all the tiles.
 	for (let row = 0; row < rows; row++) {
 		for (let col = 0; col < cols; col++) {
-			const index = row * cols + col;
-			const color = seenMap.has(index) ? COLOR_TILE_ON : COLOR_TILE_OFF;
-			grid.tiles[index].material.color.set(color);
+			const coord_str = [row, col].join(',');
+			const seen = tileState.seenMap.has(coord_str);
+
+			const color = seen ? COLOR_TILE_ON : COLOR_TILE_OFF;
+			grid.tiles.get(coord_str).material.color.set(color);
 		}
 	}
 }
