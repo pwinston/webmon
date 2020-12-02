@@ -4,8 +4,8 @@ Webmon is three things combined:
 1. Experimental napari shared memory client.
 2. A proof of concept [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
 3. An example web app that contains two pages:
-    1. `/viewer` a three.js (WebGL) display of what tiles are visible in napari.
-    2. `/loader` showing show very simple [Vega-Lite](https://vega.github.io/vega-lite/) graphs related to the `ChunkLoader`.
+    * `/viewer` a three.js (WebGL) display of what tiles are visible in napari.
+    * `/loader` with two very simple [Vega-Lite](https://vega.github.io/vega-lite/) graphs related to the `ChunkLoader`.
 
 See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details about this repo.
 
