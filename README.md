@@ -60,7 +60,10 @@ If the websocket hop is the slow part, could an [Electron](https://www.electronj
     * We are not there yet, but it's clearly heading that way for many cases.
 * Try sharing `numpy` data backed by a shared memory buffer.
 
+# Limit Overhead
 Pretty soon we'll probably need a feature where web apps can "register" for messages they want to receive. So napari is not spewing all possible messages all the time. It will only send what's strictly needed right then.
+
+That applies to messages which right now go into a queue, but it also applies to shared data in the sense that you don't want to write into shared data **at all** if no one is reading it. In all cases you want napari to do the least possible work to satsify actively listening clients.
 
 # Python Shared Memory
 
