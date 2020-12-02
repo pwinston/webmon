@@ -43,4 +43,4 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
     * A simple demo that combines Flask, Socket-IO, and three.js/WebGL
 
 # Python Shared Memory
-![tweet](https://user-images.githubusercontent.com/4163446/100826223-d9f4cc80-3427-11eb-9b95-ca31004653d7.png)
+![tweet](https://user-images.githubusercontent.com/4163446/100826307-090b3e00-3428-11eb-80ca-84c704b3ff5d.png)
