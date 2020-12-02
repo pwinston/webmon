@@ -24,7 +24,7 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
     * `npm -v` -> `6.14.4`
 * In webmon directory: `make build`
 
-# To modify JS files
+# To modify Javascript files
 
 * Do not edit .js files under `static`.
     * .json files in static are fair game.
