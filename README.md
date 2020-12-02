@@ -5,9 +5,15 @@ Webmon is three things combined:
 2. A proof of concept [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
 3. An example web app that contains two pages:
     * `/viewer` a three.js (WebGL) display of what tiles are visible in napari.
-    * `/loader` with two very simple [Vega-Lite](https://vega.github.io/vega-lite/) graphs related to the `ChunkLoader`.
+    * `/loader` with two very simple [Vega-Lite](https://vega.github.xo/vega-lite/) graphs related to the `ChunkLoader`.
 
 See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for more information.
+
+# Webmon Screenshots
+
+![tiles](https://user-images.githubusercontent.com/4163446/100827155-188b8680-342a-11eb-92bb-217321705947.png)
+
+![graphs](https://user-images.githubusercontent.com/4163446/100827017-b763b300-3429-11eb-94c0-77c5110dc275.png)
 
 # Summary
 
@@ -54,11 +60,6 @@ If the websocket hop is the slow part, could an Electron process be a shared mem
     * We are not there yet, but it's clearly heading that way for many cases.
 * Try sharing `numpy` data backed by a shared memory buffer.
 
-# Webmon Screenshots
-
-![tiles](https://user-images.githubusercontent.com/4163446/100827155-188b8680-342a-11eb-92bb-217321705947.png)
-
-![graphs](https://user-images.githubusercontent.com/4163446/100827017-b763b300-3429-11eb-94c0-77c5110dc275.png)
 
 # Python Shared Memory
 
