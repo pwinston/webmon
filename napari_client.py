@@ -208,7 +208,6 @@ class NapariClient(Thread):
         try:
             while True:
                 try:
-                    LOGGER.info("Getting remote messages")
                     message = self._remote.client_messages.get_nowait()
                 except ConnectionResetError:
                     LOGGER.error(
