@@ -41,3 +41,6 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
 # Originally Based On
 * [FlaskTest](https://github.com/ageller/FlaskTest)
     * A simple demo that combines Flask, Socket-IO, and three.js/WebGL
+
+# Python Shared Memory
+![tweet](https://user-images.githubusercontent.com/4163446/100826223-d9f4cc80-3427-11eb-9b95-ca31004653d7.png)
