@@ -43,7 +43,7 @@ If the websocket hop is the slow part, could an Electron process be a shared mem
 * Do not edit .js files under `static`.
     * .json files in static are fair game.
 * Edit .js files under `js` then build as above.
-* If Javascript only change:
+* If you made a Javascript-only change:
    * `make build`
    * Typically hard reload (shift-command-R) in Chrome is enough.
    * Typically do not need to restart napari/webmon unless you changed those.
