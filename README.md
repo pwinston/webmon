@@ -11,17 +11,28 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
 
 # Python Requirements
 
-* pip3 install -r requirements.txt
+* Python 3.9
+    * Newest shared memory features were first added in Python 3.8.
+    * However but were found using 3.8, where 3.9 works.
+* In webmon directory: `pip3 install -r requirements.txt`
 
-# Build
+# Javascript Requirements
 
-1. Install [npm](https://www.npmjs.com/get-npm)
-* `make build`
+* Install node/npm
+    * Not sure of min req but on MacOS I've been using:
+    * `node -v` -> `v14.3.0`
+    * `npm -v` -> `6.14.4`
+* In webmon directory: `make build`
 
-# Modify JS files
+# To modify JS files
 
-* Do not edit files under `static`.
-* Edit JS files under `js` then build as above.
+* Do not edit .js files under `static`.
+    * .json files in static are fair game.
+* Edit .js files under `js` then build as above.
+* If Javascript only change:
+   * `make build`
+   * Typically hard reload (shift-command-R) in Chrome is enough.
+   * Typically do not need to restart napari/webmon unless you changed those.
 
 # Screenshot
 
