@@ -1,7 +1,7 @@
 # webmon
 
 Webmon is three things combined:
-1. Experimental napari shared memory client.
+1. An experimental napari shared memory client.
 2. A proof of concept [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
 3. An example web app that contains two pages:
     * `/viewer` a three.js (WebGL) display of what tiles are visible in napari.
