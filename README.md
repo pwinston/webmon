@@ -40,10 +40,6 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
 
 ![graphs](https://user-images.githubusercontent.com/4163446/100827017-b763b300-3429-11eb-94c0-77c5110dc275.png)
 
-# Originally Based On
-* [FlaskTest](https://github.com/ageller/FlaskTest)
-    * A simple demo that combines Flask, Socket-IO, and three.js/WebGL
-
 # Python Shared Memory
 
 * [multiprocessing.shared_memory](https://docs.python.org/3/library/multiprocessing.shared_memory.html) (official docs)
@@ -53,3 +49,7 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
 ![tweet](https://user-images.githubusercontent.com/4163446/100826307-090b3e00-3428-11eb-80ca-84c704b3ff5d.png)
 
 ![hn](https://user-images.githubusercontent.com/4163446/100826691-e7f71d00-3428-11eb-8438-ebca491d6f1a.png)
+
+# Originally Based On
+* [FlaskTest](https://github.com/ageller/FlaskTest)
+    * A simple demo that combines Flask, Socket-IO, and three.js/WebGL
