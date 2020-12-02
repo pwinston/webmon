@@ -18,6 +18,9 @@ const SHOW_AXES = true;  // Draw the axes (red=X green=Y).
 const SHOW_TILES = true;  // Draw the tiles themselves.
 const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
+// MAX_TILE_SPAN is the most tiles we'll show across.
+const MAX_TILE_SPAN = 4;
+
 //
 // The (rows x cols) in the current level and related information.
 //
@@ -38,10 +41,18 @@ class TileConfig {
 		this.maxLevelDim = Math.max(this.levelShape[0], this.levelShape[1]);
 	}
 
-	tilePos(coord) {
+	bigLevel() {
+		return false;
+		return this.maxTileDim > MAX_TILE_SPAN;
+	}
+
+	//
+	// Return the normalized [0..1] position of this [row, col] tileCoord.
+	//
+	normPos(tileCoord) {
 		return [
-			coord[0] * this.tileSize / this.maxLevelDim,
-			coord[1] * this.tileSize / this.maxLevelDim,
+			tileCoord[0] * this.tileSize / this.maxLevelDim,
+			tileCoord[1] * this.tileSize / this.maxLevelDim,
 		]
 	}
 }
@@ -60,6 +71,8 @@ class TileState {
 		const max = Number.MAX_SAFE_INTEGER;
 		var corner = [max, max];
 
+		console.log("seen = ", this.message.seen);
+
 		this.message.seen.forEach(function (coord) {
 			// Map keys can't really be arrays, so use a string.
 			const str = coord.join(',');
@@ -71,9 +84,17 @@ class TileState {
 			];
 		});
 
-		// Assign after due to forEach/this issues.
 		this.seenMap = seenMap;
-		this.cornerTile = corner;
+		console.log("seenMap = ", seenMap.size);
+
+		// Choose corner which is up to MAX_TILE_SPAN/2 less than the real 
+		// corner. So if we draw the grid from that corner, we can see
+		// the sceen tiles.
+		const half = MAX_TILE_SPAN / 2;
+		this.cornerTile = [
+			Math.max(0, corner[0] - half),
+			Math.max(0, corner[1] - half),
+		];
 	};
 }
 
@@ -267,8 +288,38 @@ function createTile(pos, size) {
 	return mesh;
 }
 
+function createOneTile(row, col) {
+
+	// Use longer dimension so it fits in our [0..1] space. 
+	const maxLevelDim = tileConfig.maxLevelDim;
+
+	const levelRows = tileConfig.levelShape[0];
+	const levelCols = tileConfig.levelShape[1];
+
+	const tileSize = tileConfig.tileSize;
+
+	const posLevel = [
+		row * tileSize,
+		col * tileSize
+	]
+
+	// Size in [0..1] coordinates. Interior tiles are always
+	// (tileSize x tileSize) but edge tiles or the corner tile
+	// might be smaller.
+	const size = [
+		Math.min(tileSize, levelCols - posLevel[1]) / maxLevelDim,
+		Math.min(tileSize, levelRows - posLevel[0]) / maxLevelDim
+	];
+
+	// Position in (x, y) [0..1] coordinates.
+	const pos = [posLevel[1] / maxLevelDim, posLevel[0] / maxLevelDim];
+
+	const row_col_str = [row, col].join(",");
+	grid.tiles.set(row_col_str, createTile(pos, size));
+}
+
 //
-// Create all the tiles meshes, in the current grid size.
+// Create all the tile meshes.
 //
 function createTiles() {
 	console.log("createTiles");
@@ -282,45 +333,28 @@ function createTiles() {
 	// Start over with no tiles.
 	grid.tiles = new Map();
 
+	if (tileConfig.bigLevel()) {
+		return; // nothing for now
+	}
+
 	const fullRows = tileConfig.tileShape[0];
 	const fullCols = tileConfig.tileShape[1];
 
 	console.log(`Full tile shape ${fullRows} x ${fullCols}`);
 
-	// MAX_DIM is a total hack to avoid huge grids. It takes too long to
-	// create huge grids plus they are too tiny to see anyway.
-	//
-	// MAX_DIM totally messes things up, but it least it doesn't hang.
-	const MAX_TILE_DIM = 3;
-
 	const rows = tileConfig.tileShape[0];
 	const cols = tileConfig.tileShape[1];
 	const tileSize = tileConfig.tileSize;
 
-	// Use longer dimension so it fits in our [0..1] space. 
-	const maxLevelDim = tileConfig.maxLevelDim;
-
 	console.log(`Create tiles ${rows} x ${cols}`);
 
-	const levelRows = tileConfig.levelShape[0];
-	const levelCols = tileConfig.levelShape[1];
-
-	// Track tile's position in level pixels, so we know if we need a
-	// partial tile at the end of a row or column.
-	var x = 0;
-	var y = 0;
-
-	const cornerTile = tileState.cornerTile;
+	const start = tileState.cornerTile;
 
 	// Compute start to end range that surrounds the seen tiles, but
 	// cuts of where it should at the whole layer boundaries.
-	const start = [
-		Math.max(0, cornerTile[0] - MAX_TILE_DIM),
-		Math.max(0, cornerTile[1] - MAX_TILE_DIM)
-	];
 	const end = [
-		Math.min(rows, cornerTile[0] + MAX_TILE_DIM),
-		Math.min(cols, cornerTile[1] + MAX_TILE_DIM)
+		Math.min(rows, start[0] + MAX_TILE_SPAN),
+		Math.min(cols, start[1] + MAX_TILE_SPAN)
 	]
 
 	// Create tiles in this area. For small levels this will be the entire level,
@@ -328,28 +362,8 @@ function createTiles() {
 	// region.
 	for (let row = start[0]; row < end[0]; row++) {
 		for (let col = start[1]; col < end[1]; col++) {
-
-			// Size in [0..1] coordinates. Interior tiles are always
-			// (tileSize x tileSize) but edge tiles or the corner tile
-			// might be smaller.
-			const size = [
-				Math.min(tileSize, levelCols - x) / maxLevelDim,
-				Math.min(tileSize, levelRows - y) / maxLevelDim
-			];
-
-			// Position in [0..1] coordinates.
-			const pos = [x / maxLevelDim, y / maxLevelDim];
-
-			// Create and add the tile.			
-			const str = [row, col].join(',');
-			console.log("Create tile: ", str);
-			grid.tiles.set(str, createTile(pos, size));
-			x += tileSize;
+			createOneTile(row, col);
 		}
-
-		// Starting a new row.
-		x = 0;
-		y += tileSize;
 	}
 }
 
@@ -358,16 +372,18 @@ function createTiles() {
 // maybe it's a bit faster than create a new rect every frame?
 //
 function moveView() {
+	const normPos = [0, 0]; //tileConfig.normPos(tileState.cornerTile);
+
 	const baseX = tileConfig.baseShape[1];
 	const baseY = tileConfig.baseShape[0];
 
-	const maxDim = Math.max(baseX, baseY)
+	const maxDim = Math.max(baseX, baseY);
 
 	const corners = tileState.message.corners;
-	const x0 = corners[0][1] / maxDim;
-	const y0 = corners[0][0] / maxDim;
-	const x1 = corners[1][1] / maxDim;
-	const y1 = corners[1][0] / maxDim;
+	const x0 = corners[0][1] / maxDim - normPos[1];
+	const y0 = corners[0][0] / maxDim - normPos[0];
+	const x1 = corners[1][1] / maxDim - normPos[1];
+	const y1 = corners[1][0] / maxDim - normPos[0];
 
 	const width = x1 - x0;
 	const height = y1 - y0;
@@ -391,26 +407,42 @@ function moveViewRect(pos, scale) {
 // Update the color of all tiles. Red if seen, otherwise gray.
 //
 function updateSeen() {
-	const tilePos = tileConfig.tilePos(tileState.cornerTile)
-	internalParams.tileParent.position.x = tilePos[1];
-	internalParams.tileParent.position.y = tilePos[0];
+	// Experimental: move the entire grid to the corner location.
+	// const normPos = tileConfig.normPos(tileState.cornerTile)
+	// internalParams.tileParent.position.x = -normPos[1];
+	//internalParams.tileParent.position.y = -normPos[0];
+
+	if (tileConfig.bigLevel()) {
+		return;
+	}
 
 	var rows = tileConfig.tileShape[0];
 	var cols = tileConfig.tileShape[1];
 
-	// Update the colors of all the tiles.
-	for (let row = 0; row < rows; row++) {
-		for (let col = 0; col < cols; col++) {
-			const str = [row, col].join(',');
-			const seen = tileState.seenMap.has(str);
-			const color = seen ? COLOR_TILE_ON : COLOR_TILE_OFF;
+	const start = tileState.cornerTile;
 
-			if (!grid.tiles.has(str)) {
-				//console.log("No tile: ", str);
-			} else {
-				grid.tiles.get(str).material.color.set(color);
-			}
+	// Compute start to end range that surrounds the seen tiles, but
+	// cuts off where it should at the boundaries of the level.
+	const end = [
+		Math.min(rows, start[0] + MAX_TILE_SPAN),
+		Math.min(cols, start[1] + MAX_TILE_SPAN)
+	]
+
+	// Mark every tiles that exists not seen first.
+	grid.tiles.forEach(function (tile) {
+		tile.material.color.set(COLOR_TILE_OFF);
+	});
+
+	// Mark seen tiles as seen, creating tiles if needed.
+	for (const [row_col_str, value] of tileState.seenMap.entries()) {
+		if (!grid.tiles.has(row_col_str)) {
+			// Okay this is stilly to split, fix this.
+			const parts = row_col_str.split(",");
+			const row = parseInt(parts[0]);
+			const col = parseInt(parts[1]);
+			createOneTile(row, col);
 		}
+		grid.tiles.get(row_col_str).material.color.set(COLOR_TILE_ON);
 	}
 }
 
@@ -426,7 +458,8 @@ function createViewer() {
 	if (SHOW_VIEW) {
 		console.log("createView");
 		grid.view = createRect(COLOR_VIEW, true);
-		internalParams.tileParent.add(grid.view);
+		addToScene(grid.view);
+		//internalParams.tileParent.add(grid.view);
 	}
 
 	if (SHOW_TILES) {
