@@ -60,6 +60,7 @@ If the websocket hop is the slow part, could an Electron process be a shared mem
     * We are not there yet, but it's clearly heading that way for many cases.
 * Try sharing `numpy` data backed by a shared memory buffer.
 
+Pretty soon we'll probably need a feature where web apps can "register" for messages they want to receive. So napari is not spewing all possible messages all the time. It will only send what's strictly needed right then.
 
 # Python Shared Memory
 
