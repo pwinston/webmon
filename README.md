@@ -40,12 +40,14 @@ Beyond messages, the Big Kahuna is using shared memory buffers to back `numpy` a
    
 # What Can I Do?
 
+* Issues and PR's welcome.
 * Improve or modify the existing webmon pages.
-* Create new pages.
-    * Probably need to modify napari to send over the data you care about.
-    * Today probably need to modify `napari_client.py` and `webmon.py` in webmon.
-    * Long term `napari-client.py` and `webmon.py` can simply pass through data.
-    * Ideally only only have to change napari and then the javascript part, but we are not there yet.
+* Create new webmon pages.
+* Modify napari to send out more interesting data.
+* Today probably need to modify `napari_client.py` and `webmon.py` in webmon.
+    * Ideally longer term webmon will just "pass through" most data.
+    * So to add something to just modify napari and the Javascript, nothing else.
+    * We are not there yet, but it's clearly heading that way for many cases.
 
 # Webmon Screenshots
 
