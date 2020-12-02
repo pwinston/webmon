@@ -7,7 +7,7 @@ Webmon is three things combined:
     * `/viewer` a three.js (WebGL) display of what tiles are visible in napari.
     * `/loader` with two very simple [Vega-Lite](https://vega.github.io/vega-lite/) graphs related to the `ChunkLoader`.
 
-See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details about this repo.
+See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for more information.
 
 # Python Requirements
 
