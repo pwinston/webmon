@@ -9,6 +9,10 @@ Webmon is three things combined:
 
 See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for more information.
 
+So there is a shared memory connection between Python and this little webmon process. And there is an always-on Websocks connection between webmon and the browser. This means napari can send out messages and the browser can receive them at 30-60Hz rate. Obviously there is some limit to the message size, but I have not explored this yet.
+
+And beyond messages the untapped resource is creating raw shared memory buffers which can be used to back `numpy` `recarrays`. Then we could presumably shared large chunks of binary data. Although again the throughput limits are not known yet.
+
 # Python Requirements
 
 * Python 3.9
