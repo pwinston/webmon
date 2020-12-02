@@ -13,7 +13,7 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
 
 * Python 3.9
     * Newest shared memory features were first added in Python 3.8.
-    * However but were found using 3.8, where 3.9 works.
+    * However 3.8 seemed to have bugs, where 3.9 works.
 * In webmon directory: `pip3 install -r requirements.txt`
 
 # Javascript Requirements
