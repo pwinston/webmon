@@ -11,7 +11,7 @@ See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for
 
 So there is a shared memory connection between napari (Python) and this little webmon process (Python). And there is an always-on Websocket connection between webmon (Python) and the web app (Javascript). Messages can flow through both hops at 30-60Hz. Obviously there is some limit to the message size before things bog down. Limit is TBD.
 
-Beyond messages, the Big Kahuna is using shared memory buffers to back `numpy` arrays and `recarrays`. Then we could share large chunks of binary data. Throughput limits are not known yet. Particularly the Websocket part might the weakest link.
+Beyond messages, the Big Kahuna is using shared memory buffers to back `numpy` arrays and `recarrays`. Then we could share large chunks of binary data. Throughput limits are not known yet. Particularly the Websocket part might the weakest link. This has not be setup yet at all.
 
 # Python Requirements
 
@@ -48,6 +48,7 @@ Beyond messages, the Big Kahuna is using shared memory buffers to back `numpy` a
     * Ideally longer term webmon will just "pass through" most data.
     * So to add something to just modify napari and the Javascript, nothing else.
     * We are not there yet, but it's clearly heading that way for many cases.
+* Try sharing `numpy` data backed by a shared memory buffer.
 
 # Webmon Screenshots
 
