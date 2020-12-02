@@ -34,9 +34,11 @@ See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details abo
    * Typically hard reload (shift-command-R) in Chrome is enough.
    * Typically do not need to restart napari/webmon unless you changed those.
 
-# Screenshot
+# Screenshots
 
-![](images/screenshot.png)
+![tiles](images/screenshot.png)
+
+![graphs](https://user-images.githubusercontent.com/4163446/100827017-b763b300-3429-11eb-94c0-77c5110dc275.png)
 
 # Originally Based On
 * [FlaskTest](https://github.com/ageller/FlaskTest)
