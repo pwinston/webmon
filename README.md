@@ -1,13 +1,13 @@
 # webmon
 
-See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details about this repo.
-
-**webmon** is three things combined:
+Webmon is three things combined:
 1. Experimental napari shared memory monitor client.
-2. A [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
-3. A very simple web app that contains:
-    1. A three.js (WebGL) display of what tiles are visible in napari.
-    2. TBD other pages.
+2. A proof of concept [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
+3. An example web app that contains two pages:
+    1. `/viewer` a three.js (WebGL) display of what tiles are visible in napari.
+    2. `/loader` showing show very simple [Vega-Lite](https://vega.github.io/vega-lite/) graphs related to the `ChunkLoader`.
+
+See napari [PR 1909](https://github.com/napari/napari/pull/1909) for details about this repo.
 
 # Python Requirements
 
