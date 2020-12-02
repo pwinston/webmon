@@ -37,6 +37,15 @@ And beyond messages the untapped resource is creating raw shared memory buffers 
    * `make build`
    * Typically hard reload (shift-command-R) in Chrome is enough.
    * Typically do not need to restart napari/webmon unless you changed those.
+   
+# What Can I Do?
+
+* Improve or modify the existing webmon pages.
+* Create new pages.
+    * Probably need to modify napari to send over the data you care about.
+    * Today probably need to modify `napari_client.py` and `webmon.py` in webmon.
+    * Long term `napari-client.py` and `webmon.py` can simply pass through data.
+    * Ideally only only have to change napari and then the javascript part, but we are not there yet.
 
 # Webmon Screenshots
 
