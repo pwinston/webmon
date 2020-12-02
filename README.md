@@ -13,7 +13,9 @@ See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for
 
 There is a shared memory connection between napari (Python) and this little webmon process (Python). And there is an always-on Websocket connection between webmon (Python) and the web app (Javascript). Messages can flow through both hops at 30-60Hz. Obviously there is some limit to the message size before things bog down. Limit is TBD.
 
-Beyond messages, the Big Kahuna is using shared memory buffers to back `numpy` arrays and `recarrays`. Then we could share large chunks of binary data. Throughput limits are not known yet. Particularly the Websocket part might the weakest link. This has not be setup yet at all.
+Beyond messages, the Big Kahuna is using shared memory buffers to back `numpy` arrays and `recarrays`. Then we could share large chunks of binary data. Throughput limits are not known yet. Particularly the Websocket hop might be the slow part. This has not be setup yet at all.
+
+If the websocket hop is the slow part, could an Electron process be a shared memory client, and then directly render the data? TBD.
 
 # Python Requirements
 
