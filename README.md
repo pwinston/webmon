@@ -51,8 +51,8 @@ If the websocket hop is the slow part, could an Electron process be a shared mem
 # What Can I Do?
 
 * Issues and PR's needed, including this README.
-* Improve or modify the existing webmon pages.
-* Create new webmon pages.
+* Improve or modify the existing web app pages.
+* Create new web app pages.
 * Modify napari to send out more interesting data.
 * Today probably need to modify `napari_client.py` and `webmon.py` in webmon.
     * Ideally longer term webmon will just "pass through" most data.
