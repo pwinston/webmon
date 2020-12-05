@@ -74,37 +74,37 @@ bog down. Limit is TBD.
 # What Can I Do?
 
 * Issues and PR's needed.
-    * Update this README if figure out a common problem.
+    * Update this README if were stuck on something.
 * Modify existing pages or create new ones.
    * Use **tailwindcss** and **Vega-Lite** more fully.
    * Use other styles/packages/modules beyond those.
-* Modify napari to share more things.
+* Modify **napari** to share more things.
    * Try sharing `numpy` data backed by a shared memory buffer.
    * Create a system so we only share data if a client is asking for it.
+* Modify **napari** so the WebUI can control more things.
 
 # Future Work
 
 Beyond messages, the Big Kahuna would be using shared memory buffers to
 back `numpy` arrays and `recarrays`. Then we could share large chunks of
 binary data. Throughput limits are not known yet. Particularly the
-Websocket hop might be the slow part. This has not been attempted yet.
-
-If the websocket hop is the slow part, could an
+Websocket hop might be the slow part. This has not been attempted yet. If
+the websocket hop is the slow part, could an
 [Electron](https://www.electronjs.org/) process be a shared memory client,
 and then directly render the data? TBD.
 
 # References
+
+## Tailwind CSS
+
+* [Getting Started with Tailwind CSS in 15 Minutes](https://scotch.io/tutorials/get-started-with-tailwind-css-in-15-minutes)
+* [Tailwind CSS for Absolute Beginners](https://codingthesmartway.com/tailwind-css-for-absolute-beginners/)
 
 ## Vega-Lite
 
 * [Example Gallery](https://vega.github.io/vega-lite/examples/)
 * [Introduction to Vega-Lite](https://vega.github.io/vega-lite/tutorials/getting_started.html)
 * [Vega-Lite with Websockets](https://bl.ocks.org/domoritz/8e1e4da185e1a32c7e54934732a8d3d5)
-
-## Tailwind CSS
-
-* [Getting Started with Tailwind CSS in 15 Minutes](https://scotch.io/tutorials/get-started-with-tailwind-css-in-15-minutes)
-* [Tailwind CSS for Absolute Beginners](https://codingthesmartway.com/tailwind-css-for-absolute-beginners/)
 
 ## Python Shared Memory
 
@@ -113,8 +113,6 @@ and then directly render the data? TBD.
 * [Interview With Davin Potts](https://www.vertica.com/blog/one-on-one-davin-potts-3-news-for-upcoming-python-release-3-8/) (core contributor)
 
 ![tweet](https://user-images.githubusercontent.com/4163446/100826307-090b3e00-3428-11eb-80ca-84c704b3ff5d.png)
-
-![hn](https://user-images.githubusercontent.com/4163446/100826691-e7f71d00-3428-11eb-8438-ebca491d6f1a.png)
 
 ## Originally Derived From
 
