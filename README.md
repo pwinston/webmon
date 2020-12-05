@@ -86,6 +86,12 @@ bog down. Limit is TBD.
 # FAQ
 
 ## Why is NAPARI_MON starting two copies of napari?
+## Or what is this error:
+
+```
+An attempt has been made to start a new process before the
+current process has finished its bootstrapping phase.
+```
 
 If you are using your own script to launch napari, make sure you 
 are using the convention:
