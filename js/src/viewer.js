@@ -482,8 +482,10 @@ function createViewer() {
 // Create the GUI.
 //
 function createGUI() {
-	internalParams.gui = new GUI();
+	internalParams.gui = new GUI({ autoPlace: false });
 	internalParams.gui.add(externalParams, 'show_grid').onChange(sendGUIinfo);
+	// manually place gui in container
+	document.getElementById('gui').appendChild(internalParams.gui.domElement);
 }
 
 //
