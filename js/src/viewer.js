@@ -6,8 +6,6 @@
 import * as THREE from 'three';
 
 import {
-	externalParams,
-	defineExternalParams,
 	internalParams,
 	defineInternalParams,
 	initScene,
@@ -19,6 +17,19 @@ const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
 // MAX_TILE_SPAN is the most tiles we'll show across.
 const MAX_TILE_SPAN = 4;
+
+class ViewerControls {
+	constructor() {
+		this.show_grid = false;
+	}
+
+	send() {
+		console.log('send()', this);
+		internalParams.socket.emit('send_command', this);
+	}
+}
+
+var viewerControls = new ViewerControls();
 
 //
 // The (rows x cols) in the current level and related information.
@@ -478,14 +489,6 @@ function createViewer() {
 }
 
 //
-// Send the GUI settings back to Flask.
-//
-function sendGUIinfo() {
-	console.log("send command", externalParams);
-	internalParams.socket.emit('send_command', externalParams);
-}
-
-//
 // Animation loop. Not using this yet?
 //
 function animateViewer(time) {
@@ -497,8 +500,8 @@ function animateViewer(time) {
 function setupControls() {
 	const showGrid = document.getElementById('showGrid');
 	showGrid.addEventListener('change', event => {
-		externalParams.show_grid = event.target.checked;
-		sendGUIinfo();
+		viewerControls.show_grid = event.target.checked;
+		viewerControls.send();
 	});
 
 	const selectCar = document.getElementById('selectCar');
@@ -514,7 +517,6 @@ export function startViewer() {
 	console.log("startViewer")
 
 	defineInternalParams();
-	defineExternalParams();
 
 	initScene();
 	setupControls();

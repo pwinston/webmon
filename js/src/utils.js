@@ -11,13 +11,6 @@ import io from 'socket.io-client';
 
 const ZOOM = 0.8;
 
-export var externalParams;
-export function defineExternalParams() {
-	externalParams = new function () {
-		this.show_grid = false;
-	};
-}
-
 export var internalParams;
 export function defineInternalParams() {
 	internalParams = new function () {
@@ -60,14 +53,6 @@ export function getURLvars() {
 		vars[key] = value;
 	});
 	return vars;
-}
-
-export function setParamsFromURL() {
-	var vars = getURLvars();
-	var keys = Object.keys(vars);
-	keys.forEach(function (k) {
-		externalParams[k] = parseFloat(vars[k])
-	});
 }
 
 //
@@ -127,15 +112,4 @@ export function initScene() {
 
 	//controls
 	internalParams.controls = new TrackballControls(internalParams.camera, internalParams.renderer.domElement);
-}
-
-export function setURLvars() {
-	var keys = Object.keys(externalParams);
-	var vars = "/gui?" //this needs to be the same as what is in flask
-	keys.forEach(function (k) {
-		if (k != "gui") {
-			vars += k + "=" + externalParams[k] + "&";
-		}
-	});
-	window.history.pushState("externalParams", "updated", vars);
 }
