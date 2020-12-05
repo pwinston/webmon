@@ -49,6 +49,16 @@ bog down. Limit is TBD.
 
 # Making Changes
 
+## Python
+
+* `webmon.py` and `napari_client.py` are pretty immature and need work.
+
+Long term it would be nice if the Python part was pretty generic. So to add
+new **WebUI** you only had to modify **napari** to share the data and then
+modify the **WebUI** to show the data. And the Python parts just pass data
+around without caring what the data is about. We are heading in that
+direction, but not there yet.
+
 ## HTML
 
 * So far we are using [tailwindcss](tailwindcss.com).
