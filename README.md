@@ -61,10 +61,10 @@ direction, but not there yet.
 
 ## HTML
 
-* So far we are using [tailwindcss](tailwindcss.com).
-* Similar to [bootstrap](getbootstrap.com) but more modern.
-* VS Code extension: [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
-* The `styles.css` file is huge but "in production" is trims it down to just what's needed.
+* [Tailwind CSS](tailwindcss.com).
+    * Like [bootstrap](getbootstrap.com) but more modern.
+    * VS Code extension: [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
+    * The `styles.css` file is trimmed/customized "in production".
 
 ## Javascript
 
