@@ -1,6 +1,6 @@
 # webmon
 
-Webmon is three things combined:
+Webmon is three things:
 1. An experimental [napari](https://napari.org/) shared memory client.
 2. A proof of concept [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
 3. An example web app that contains two pages:
@@ -98,7 +98,7 @@ If the websocket hop is the slow part, could an [Electron](https://www.electronj
 
 ![hn](https://user-images.githubusercontent.com/4163446/100826691-e7f71d00-3428-11eb-8438-ebca491d6f1a.png)
 
-# Originally Derived From
+## Originally Derived From
 
 * [FlaskTest](https://github.com/ageller/FlaskTest)
     * A simple demo that combines Flask, Socket-IO, and three.js/WebGL
