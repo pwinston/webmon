@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="absolute right-0" id="gui"></div>
-<div class="z-0" id="WebGLContainer"></div>
+<div class="overflow-hidden	">
+	<div class="absolute right-4" id="gui"></div>
+	<div id="WebGLContainer"></div>
+</div>
 
 <script type="module">
 	import { startViewer } from '/static/viewer.js';

@@ -8,26 +8,30 @@
 </head>
 
 <nav class="bg-gray-800">
-    <div class="px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
-        <div class="flex items-center">
-          <div class="flex-shrink-0">
-            <img class="h-8 w-8" src="https://github.com/napari/napari/raw/master/napari/resources/logo.png" alt="Workflow">
-          </div>
-          <div>
-            <div class="ml-10 flex items-baseline space-x-4">
-              <!-- Current: "bg-gray-900 text-white", Default: "text-gray-300 hover:bg-gray-700 hover:text-white" -->
-              <a href="/viewer" class="bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-medium">Viewer</a>
-
-              <a href="/loader" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Loader</a>
-
-              <a href="/blank" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">Blank</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </nav>
+	<div class="px-4 sm:px-6 lg:px-8">
+		<div class="flex items-center justify-between h-16">
+			<div class="flex items-center">
+				<div class="flex-shrink-0">
+					<img class="h-8 w-8" src="https://github.com/napari/napari/raw/master/napari/resources/logo.png" alt="Workflow">
+				</div>
+				<div class="ml-10 flex items-baseline space-x-4">
+					{% for route in routes %}
+						{% if route.active %}
+						<a href="{{route.href}}" class="bg-gray-900 text-white px-3 py-2 rounded-md text-sm font-medium">{{route.name}}</a>
+						{% else %}
+						<a href="{{route.href}}" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium">{{route.name}}</a>
+						{% endif %}
+					{% endfor %}
+				</div>
+			</div>
+			<div>
+				<div class="ml-4 flex items-center md:ml-6">
+					  <a href="/stop" class="bg-red-800 text-white px-3 py-2 rounded-md text-sm font-medium">stop</a>
+				</div>
+			  </div>
+		</div>
+	</div>
+</nav>
 
 <body class="bg-gray-200">
 	{% block content %}
