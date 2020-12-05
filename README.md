@@ -100,9 +100,8 @@ process a second time. Only this time `__name__` will not be set to
 `"__main__"`.
 
 Your code and napari's code should not do anything on import-time that it's
-not safe do a second time. The entire main flow the application should only
-come from a `main()` which is only called the first time the process is
-started.
+not safe do a second time. The main flow the application should only come
+from a guarded `main()` call.
 
 The `SharedMemoryManager` forks the main process so it can start a little
 manager process that will talk to remote clients. This second process wants
