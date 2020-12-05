@@ -4,11 +4,8 @@
 // WebGL display of which octree tiles are visible in napari.
 //
 import * as THREE from 'three';
-import { GUI } from 'dat.gui';
 
 import {
-	externalParams,
-	defineExternalParams,
 	internalParams,
 	defineInternalParams,
 	initScene,
@@ -20,6 +17,19 @@ const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
 // MAX_TILE_SPAN is the most tiles we'll show across.
 const MAX_TILE_SPAN = 4;
+
+class ViewerControls {
+	constructor() {
+		this.show_grid = false;
+	}
+
+	send() {
+		console.log('send()', this);
+		internalParams.socket.emit('send_command', this);
+	}
+}
+
+var viewerControls = new ViewerControls();
 
 //
 // The (rows x cols) in the current level and related information.
@@ -71,7 +81,7 @@ class TileState {
 		const max = Number.MAX_SAFE_INTEGER;
 		var corner = [max, max];
 
-		console.log("seen = ", this.message.seen);
+		// console.log("seen = ", this.message.seen);
 
 		this.message.seen.forEach(function (coord) {
 			// Map keys can't really be arrays, so use a string.
@@ -85,7 +95,7 @@ class TileState {
 		});
 
 		this.seenMap = seenMap;
-		console.log("seenMap = ", seenMap.size);
+		// console.log("seenMap = ", seenMap.size);
 
 		// Choose corner which is up to MAX_TILE_SPAN/2 less than the real 
 		// corner. So if we draw the grid from that corner, we can see
@@ -456,7 +466,7 @@ function createViewer() {
 
 
 	if (SHOW_VIEW) {
-		console.log("createView");
+		console.log("createViewer");
 		grid.view = createRect(COLOR_VIEW, true);
 		addToScene(grid.view);
 		//internalParams.tileParent.add(grid.view);
@@ -479,28 +489,25 @@ function createViewer() {
 }
 
 //
-// Create the GUI.
-//
-function createGUI() {
-	internalParams.gui = new GUI();
-	internalParams.gui.add(externalParams, 'show_grid').onChange(sendGUIinfo);
-}
-
-//
-// Send the GUI settings back to Flask.
-//
-function sendGUIinfo() {
-	console.log("send command", externalParams);
-	internalParams.socket.emit('send_command', externalParams);
-}
-
-//
 // Animation loop. Not using this yet?
 //
 function animateViewer(time) {
 	requestAnimationFrame(animateViewer);
 	internalParams.controls.update();
 	internalParams.renderer.render(internalParams.scene, internalParams.camera);
+}
+
+function setupControls() {
+	const showGrid = document.getElementById('showGrid');
+	showGrid.addEventListener('change', event => {
+		viewerControls.show_grid = event.target.checked;
+		viewerControls.send();
+	});
+
+	const selectCar = document.getElementById('selectCar');
+	selectCar.onchange = function () {
+		alert(selectCar.value);
+	}
 }
 
 //
@@ -510,10 +517,9 @@ export function startViewer() {
 	console.log("startViewer")
 
 	defineInternalParams();
-	defineExternalParams();
 
 	initScene();
-	createGUI();
+	setupControls();
 
 	createViewer();
 	animateViewer();

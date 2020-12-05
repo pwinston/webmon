@@ -82,6 +82,10 @@ class NapariBridge:
                 self.client.send_command(command)
 
     def _process_messages(self) -> None:
+        """Process message from napari."""
+        if self.client is None:
+            return
+
         while True:
             message = self.client.get_napari_message()
 
