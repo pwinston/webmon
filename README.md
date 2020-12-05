@@ -23,14 +23,16 @@ Beyond messages, the Big Kahuna would be using shared memory buffers to back `nu
 
 If the websocket hop is the slow part, could an [Electron](https://www.electronjs.org/) process be a shared memory client, and then directly render the data? TBD.
 
-# Python Requirements
+# Requirements
+
+## Python
 
 * Python 3.9
     * Newest shared memory features were first added in Python 3.8.
     * However 3.8 seemed to have bugs, where 3.9 works.
 * In webmon directory: `pip3 install -r requirements.txt`
 
-# Javascript Requirements
+## Javascript
 
 * Install node/npm
     * Not sure of min req but on MacOS I've been using:
@@ -38,7 +40,16 @@ If the websocket hop is the slow part, could an [Electron](https://www.electronj
     * `npm -v` -> `6.14.4`
 * In webmon directory: `make build`
 
-# To modify Javascript files
+# Making Changes
+
+## HTML
+
+* So far we are using [tailwindcss](tailwindcss.com).
+* Similar to [bootstrap](getbootstrap.com) but more modern.
+* VS Code extension: [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
+* The `styles.css` file is huge but "in production" is trims it down to just what's needed.
+
+## Javascript
 
 * Do not edit .js files under `static`.
     * .json files in static are fair game.
@@ -47,7 +58,12 @@ If the websocket hop is the slow part, could an [Electron](https://www.electronj
    * `make build`
    * Typically hard reload (shift-command-R) in Chrome is enough.
    * Typically do not need to restart napari/webmon unless you changed those.
-   
+
+# Vega-Lite
+
+* We are using [Vega-Lite](https://vega.github.io/vega-lite/) for viz.
+* You can modify the `.json` files in `static/specs`.
+
 # What Can I Do?
 
 * Issues and PR's needed.
@@ -58,23 +74,6 @@ If the websocket hop is the slow part, could an [Electron](https://www.electronj
 * Modify napari to share more things.
    * Try sharing `numpy` data backed by a shared memory buffer.
    * Create a system so we only share data if a client is asking for it.
-
-# Modify HTML
-
-* So far we are using [tailwindcss](tailwindcss.com).
-* Similar to [bootstrap](getbootstrap.com) but more modern.
-* VS Code extension: [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
-* The `styles.css` file is huge but "in production" is trims it down to just what's needed.
-
-# Modify Javascript
-
-* Do not edit `js` files under `static`.
-* Edit `js` files under the `js` directory then build as above.
-
-# Modify Vega-Lite
-
-* We are using [Vega-Lite](https://vega.github.io/vega-lite/) for viz.
-* You can modify the `.json` files in `static/specs`.
 
 # References
 
@@ -99,7 +98,7 @@ If the websocket hop is the slow part, could an [Electron](https://www.electronj
 
 ![hn](https://user-images.githubusercontent.com/4163446/100826691-e7f71d00-3428-11eb-8438-ebca491d6f1a.png)
 
-# Derived From
+# Originally Derived From
 
 * [FlaskTest](https://github.com/ageller/FlaskTest)
     * A simple demo that combines Flask, Socket-IO, and three.js/WebGL
