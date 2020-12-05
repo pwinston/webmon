@@ -17,6 +17,17 @@
 <main>
 	<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
 		<!-- Viewer Content -->
+		<div class="p-8">
+			<input type="checkbox" id="showGrid" checked>
+			<label for="ShowGrid">Show Grid</label><br>
+			<label for="selectCar">Choose a car:</label>
+			<select id="selectCar" name="carlist" form="carform">
+				<option value="volvo">Volvo</option>
+				<option value="saab">Saab</option>
+				<option value="opel">Opel</option>
+				<option value="audi">Audi</option>
+			</select>
+		</div>
 		<div id="WebGLContainer" class="webgl"></div>
 	</div>
 </main>
