@@ -18,17 +18,6 @@ export function defineExternalParams() {
 	};
 }
 
-export var tileState;
-export function defineTileState() {
-	tileState = new function () {
-		this.seen = [];
-		this.corners = [[0, 0], [1, 1]];
-		this.normalized = [];
-		this.tiles = [];
-		this.view = [];
-	};
-}
-
 export var internalParams;
 export function defineInternalParams() {
 	internalParams = new function () {
@@ -37,6 +26,7 @@ export function defineInternalParams() {
 		this.renderer = null;
 		this.scene = null;
 		this.group = null;
+		this.tileParent = null;
 
 		//for frustum      
 		this.zmax = 5.e10;
@@ -99,15 +89,16 @@ export function initScene() {
 	// scene
 	internalParams.scene = new THREE.Scene();
 
-
 	internalParams.group = new THREE.Group();
 	internalParams.scene.add(internalParams.group);
+
+	internalParams.tileParent = new THREE.Group();
+	internalParams.group.add(internalParams.tileParent);
 
 	const height = 1;
 	const width = height * aspect;
 	const near = 0;
 	const far = 1;
-
 
 	// Camera
 	var camera = new THREE.OrthographicCamera(

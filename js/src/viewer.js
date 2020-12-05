@@ -9,91 +9,151 @@ import { GUI } from 'dat.gui';
 import {
 	externalParams,
 	defineExternalParams,
-	tileState,
-	defineTileState,
 	internalParams,
 	defineInternalParams,
 	initScene,
 } from './utils.js';
 
-// Draw the axes (red=X green=Y).
-const SHOW_AXES = true;
+const SHOW_AXES = true;  // Draw the axes (red=X green=Y).
+const SHOW_TILES = true;  // Draw the tiles themselves.
+const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
-// Draw the tiles themselves.
-const SHOW_TILES = true;
+// MAX_TILE_SPAN is the most tiles we'll show across.
+const MAX_TILE_SPAN = 4;
 
-// Draw the rect depicting Napari's current view frustum.
-const SHOW_VIEW = true;
-
-// TODO: get rid of all these accessors once napari message is
-// improved to have better named keys.
+//
+// The (rows x cols) in the current level and related information.
+//
 class TileConfig {
-	constructor(config) {
-		this.config = config;  // The config from napari.
+	constructor(message) {
+		this.message = message;  // The config from napari.
 
-		// Pull all these out not just to change the case of the variables,
-		// but because these names make more sense. We might change the
-		// napari message to match.
-		this.levelIndex = config.level_index;;
-		this.numTileRows = config.shape_in_tiles[0];
-		this.tileSize = config.tile_size;
+		// Use better names. We should update napari to use these names
+		// (although keep the Python word_case).
+		this.levelIndex = message.level_index;;
+		this.tileSize = message.tile_size;
 
-		this.numTileRows = config.shape_in_tiles[0];
-		this.numTileCols = config.shape_in_tiles[1];
+		this.tileShape = message.shape_in_tiles;
+		this.levelShape = message.image_shape;
+		this.baseShape = message.base_shape;
 
-		this.numLevelRows = config.image_shape[0];
-		this.numLevelCols = config.image_shape[1];
-		this.maxLevelDim = Math.max(this.numLevelRows, this.numLevelCols);
+		this.maxTileDim = Math.max(this.tileShape[0], this.tileShape[1]);
+		this.maxLevelDim = Math.max(this.levelShape[0], this.levelShape[1]);
+	}
 
-		this.numBaseRows = config.base_shape[0];
-		this.numBaseCols = config.base_shape[1];
+	bigLevel() {
+		return false;
+		return this.maxTileDim > MAX_TILE_SPAN;
+	}
+
+	//
+	// Return the normalized [0..1] position of this [row, col] tileCoord.
+	//
+	normPos(tileCoord) {
+		return [
+			tileCoord[0] * this.tileSize / this.maxLevelDim,
+			tileCoord[1] * this.tileSize / this.maxLevelDim,
+		]
 	}
 }
 
-// Initialize to a (1 x 1) grid of tiles, just to have something to draw
-// until we get real data.
+//
+// Which tiles were seen and the corners (for the view).
+//
+class TileState {
+	constructor(message) {
+		this.message = message;  // The state from napari.
+
+		// seenMap is used later on to set the colors of the tiles.
+		var seenMap = new Map();
+
+		// Compute the "corner" of the seen tiles, the lowest row/col seen.
+		const max = Number.MAX_SAFE_INTEGER;
+		var corner = [max, max];
+
+		console.log("seen = ", this.message.seen);
+
+		this.message.seen.forEach(function (coord) {
+			// Map keys can't really be arrays, so use a string.
+			const str = coord.join(',');
+			seenMap.set(str, 1);
+
+			corner = [
+				Math.min(corner[0], coord[0]),
+				Math.min(corner[1], coord[1])
+			];
+		});
+
+		this.seenMap = seenMap;
+		console.log("seenMap = ", seenMap.size);
+
+		// Choose corner which is up to MAX_TILE_SPAN/2 less than the real 
+		// corner. So if we draw the grid from that corner, we can see
+		// the sceen tiles.
+		const half = MAX_TILE_SPAN / 2;
+		this.cornerTile = [
+			Math.max(0, corner[0] - half),
+			Math.max(0, corner[1] - half),
+		];
+	};
+}
+
+//
+// Graphical elements for drawing the grid.
+//
+class Grid {
+	constructor() {
+		this.tiles = new Map();
+		this.view = null;
+	};
+
+	update() {
+		if (SHOW_TILES) {
+			updateSeen();
+		}
+
+		if (SHOW_VIEW) {
+			moveView();
+		}
+	}
+}
+
+var grid = new Grid();
+
+// Create with defaults in case we draw before getting any data.
 var tileConfig = new TileConfig({
 	base_shape: [256, 256],
 	image_shape: [256, 256],
 	shape_in_tiles: [1, 1],
 	tile_size: 256,
-	level_index: 0
-})
+	level_index: null  // so we update it with the real tileConfig
+});
 
-function setTileConfig(config) {
+// Create with defaults in case we draw before getting any data.
+var tileState = new TileState({
+	seen: [],
+	corners: [[0, 0], [1, 1]]
+});
 
-	if (!config)
-		return
+//
+// webmon sent us some data.
+//
+function setTileData(msg) {
+	tileState = new TileState(msg.tile_state);
 
 	// Only create tiles if level changed. Because toggling colors is cheaper
-	// then creating new tiles, so only create if needed.
-	if (!tileConfig || tileConfig.levelIndex != config['level_index']) {
-		tileConfig = new TileConfig(config);
+	// then creating new tiles, so only create tiles if needed.
+	if (!tileConfig || tileConfig.levelIndex != msg.tile_config['level_index']) {
+		tileConfig = new TileConfig(msg.tile_config);
 
 		if (SHOW_TILES) {
 			createTiles();
 		}
 	}
-}
 
-function setTileState(state) {
-	if (!state)
-		return
-
-	tileState.seen = state.seen;
-	tileState.corners = state.corners;
 	if (SHOW_TILES) {
-		updateTiles();
+		grid.update();
 	}
-}
-
-//
-// webmon sent us a set_tile_data message
-//
-function setTileData(msg) {
-	//console.log("setTileData", msg)
-	setTileConfig(msg.tile_config)
-	setTileState(msg.tile_state)
 }
 
 // References:
@@ -132,18 +192,19 @@ const COLOR_TILE_ON = 0xE11313;  // red
 const COLOR_VIEW = 0xF5C542; // yellow
 
 // In a way the tiles are all full size with zero gaps between them,
-// but we draw the tiles a bit smaller so it looks like there is gap,
-// which just makes it easier to see them as individual tiles.
+// but we draw the tiles a bit smaller so it looks like there are gaps.
 const TILE_GAP = 0.05;
 
 function addToScene(object) {
 	internalParams.group.add(object);
 }
 
-function removeFromScene(object) {
-	internalParams.group.remove(object);
-}
-
+//
+// Draw a single thin line. 
+//
+// All lines are one pixel wide. There is a line width option but docs say
+// it does nothing in most renderers. And it seemed to do nothing for us.
+//
 function drawLine(start, end, color) {
 	const points = [];
 	points.push(new THREE.Vector2(...start));
@@ -157,6 +218,10 @@ function drawLine(start, end, color) {
 	addToScene(line);
 }
 
+//
+// Red line for X axis which is left to right.
+// Green line for Y axis which is top to bottom.
+//
 function createAxes() {
 	const depth = -1;
 	const origin = [0, 0, depth];
@@ -191,12 +256,6 @@ function createRect(rectColor, onTop = false) {
 		mesh.renderOrder = 10;
 	}
 
-	// Defaults to all zeros? Lets be explicit for now.
-	mesh.position.x = 0;
-	mesh.position.y = 0;
-	mesh.position.z = 0;
-
-	addToScene(mesh);
 	return mesh;
 }
 
@@ -205,10 +264,11 @@ function createRect(rectColor, onTop = false) {
 //
 function createTile(pos, size) {
 
-	// Start as COLOR_TILE_OFF, later in updateTileColors() we toggle it
+	// Start as COLOR_TILE_OFF, later in updateSeen() we toggle it
 	// between COLOR_TILE_ON and COLOR_TILE_OFF depending on whether it was
 	// seen by the view.  
 	var mesh = createRect(COLOR_TILE_OFF);
+	internalParams.tileParent.add(mesh);
 
 	// Shrink it down a bit to create a small gap between tiles.
 	const rectSize = [
@@ -228,71 +288,82 @@ function createTile(pos, size) {
 	return mesh;
 }
 
-//
-// Create all the tiles meshes, in the current grid size.
-//
-function createTiles() {
-
-	// Remove all the old ones for now, we could re-use them to minimize
-	// the number of mesh creations, but does it matter?
-	tileState.tiles.forEach(function (tile) {
-		removeFromScene(tile);
-	})
-
-	// Start over with no tiles.
-	tileState.tiles = [];
-
-	const requestRows = tileConfig.numTileRows;
-	const requestCols = tileConfig.numTileCols;
-
-	console.log(`Request tiles ${requestRows} x ${requestCols}`);
-
-	// MAX_DIM is a total hack to avoid huge grids. It takes too long to
-	// create huge grids plus they are too tiny to see anyway.
-	//
-	// MAX_DIM totally messes things up, but it least it doesn't hang.
-	const MAX_TILE_DIM = 50;
-
-	const rows = Math.min(tileConfig.numTileRows, MAX_TILE_DIM);
-	const cols = Math.min(tileConfig.numTileCols, MAX_TILE_DIM);
-	const tileSize = tileConfig.tileSize;
+function createOneTile(row, col) {
 
 	// Use longer dimension so it fits in our [0..1] space. 
 	const maxLevelDim = tileConfig.maxLevelDim;
 
+	const levelRows = tileConfig.levelShape[0];
+	const levelCols = tileConfig.levelShape[1];
+
+	const tileSize = tileConfig.tileSize;
+
+	const posLevel = [
+		row * tileSize,
+		col * tileSize
+	]
+
+	// Size in [0..1] coordinates. Interior tiles are always
+	// (tileSize x tileSize) but edge tiles or the corner tile
+	// might be smaller.
+	const size = [
+		Math.min(tileSize, levelCols - posLevel[1]) / maxLevelDim,
+		Math.min(tileSize, levelRows - posLevel[0]) / maxLevelDim
+	];
+
+	// Position in (x, y) [0..1] coordinates.
+	const pos = [posLevel[1] / maxLevelDim, posLevel[0] / maxLevelDim];
+
+	const row_col_str = [row, col].join(",");
+	grid.tiles.set(row_col_str, createTile(pos, size));
+}
+
+//
+// Create all the tile meshes.
+//
+function createTiles() {
+	console.log("createTiles");
+
+	// Remove all the old ones for now, we could re-use them to minimize
+	// the number of mesh creations, but does it matter?
+	grid.tiles.forEach(function (tile) {
+		internalParams.tileParent.remove(tile);
+	})
+
+	// Start over with no tiles.
+	grid.tiles = new Map();
+
+	if (tileConfig.bigLevel()) {
+		return; // nothing for now
+	}
+
+	const fullRows = tileConfig.tileShape[0];
+	const fullCols = tileConfig.tileShape[1];
+
+	console.log(`Full tile shape ${fullRows} x ${fullCols}`);
+
+	const rows = tileConfig.tileShape[0];
+	const cols = tileConfig.tileShape[1];
+	const tileSize = tileConfig.tileSize;
+
 	console.log(`Create tiles ${rows} x ${cols}`);
 
-	const levelRows = tileConfig.numLevelRows;
-	const levelCols = tileConfig.numLevelCols;
+	const start = tileState.cornerTile;
 
-	// Track tile's position in level pixels, so we know if we need a
-	// partial tile at the end of a row or column.
-	var x = 0;
-	var y = 0;
+	// Compute start to end range that surrounds the seen tiles, but
+	// cuts of where it should at the whole layer boundaries.
+	const end = [
+		Math.min(rows, start[0] + MAX_TILE_SPAN),
+		Math.min(cols, start[1] + MAX_TILE_SPAN)
+	]
 
-	// Add in order so that index = row * cols + col
-	for (let row = 0; row < rows; row++) {
-		for (let col = 0; col < cols; col++) {
-
-			// Size in [0..1] coordinates. Interior tiles are always
-			// (tileSize x tileSize) but edge tiles or the corner tile
-			// might be smaller.
-			const size = [
-				Math.min(tileSize, levelCols - x) / maxLevelDim,
-				Math.min(tileSize, levelRows - y) / maxLevelDim
-			];
-
-			// Position in [0..1] coordinates.
-			const pos = [x / maxLevelDim, y / maxLevelDim];
-
-			// Create and add the tile.			
-			tileState.tiles.push(createTile(pos, size));
-			x += tileSize;
+	// Create tiles in this area. For small levels this will be the entire level,
+	// for large levels this will be at most a [-MAX_TILE_DIM..MAX_TILE_DIM]
+	// region.
+	for (let row = start[0]; row < end[0]; row++) {
+		for (let col = start[1]; col < end[1]; col++) {
+			createOneTile(row, col);
 		}
-
-		// Starting a new row.
-		x = 0;
-		y += tileSize;
 	}
 }
 
@@ -301,15 +372,18 @@ function createTiles() {
 // maybe it's a bit faster than create a new rect every frame?
 //
 function moveView() {
-	const baseX = tileConfig.numBaseCols;
-	const baseY = tileConfig.numBaseRows;
+	const normPos = [0, 0]; //tileConfig.normPos(tileState.cornerTile);
 
-	const bigger = Math.max(baseX, baseY)
+	const baseX = tileConfig.baseShape[1];
+	const baseY = tileConfig.baseShape[0];
 
-	const x0 = tileState.corners[0][1] / bigger;
-	const y0 = tileState.corners[0][0] / bigger;
-	const x1 = tileState.corners[1][1] / bigger;
-	const y1 = tileState.corners[1][0] / bigger;
+	const maxDim = Math.max(baseX, baseY);
+
+	const corners = tileState.message.corners;
+	const x0 = corners[0][1] / maxDim - normPos[1];
+	const y0 = corners[0][0] / maxDim - normPos[0];
+	const x1 = corners[1][1] / maxDim - normPos[1];
+	const y1 = corners[1][0] / maxDim - normPos[0];
 
 	const width = x1 - x0;
 	const height = y1 - y0;
@@ -323,46 +397,52 @@ function moveView() {
 }
 
 function moveViewRect(pos, scale) {
-	//console.log("moveViewRect: ", pos, scale);
-	tileState.view.scale.set(...scale);
-	tileState.view.position.x = pos[0];
-	tileState.view.position.y = pos[1];
-	tileState.view.position.z = 0;
+	grid.view.scale.set(...scale);
+	grid.view.position.x = pos[0];
+	grid.view.position.y = pos[1];
+	grid.view.position.z = 0;
 }
 
-function updateTileColors() {
-	var rows = tileConfig.numTileRows;
-	var cols = tileConfig.numTileCols;
+//
+// Update the color of all tiles. Red if seen, otherwise gray.
+//
+function updateSeen() {
+	// Experimental: move the entire grid to the corner location.
+	// const normPos = tileConfig.normPos(tileState.cornerTile)
+	// internalParams.tileParent.position.x = -normPos[1];
+	//internalParams.tileParent.position.y = -normPos[0];
 
-	var seenMap = new Map();
+	if (tileConfig.bigLevel()) {
+		return;
+	}
 
-	// Populate seen_map so we can set the colors based on it.
-	tileState.seen.forEach(function (coords) {
-		const row = parseInt(coords[0]);
-		const col = parseInt(coords[1]);
-		const index = row * cols + col;
-		seenMap.set(index, 1);
+	var rows = tileConfig.tileShape[0];
+	var cols = tileConfig.tileShape[1];
+
+	const start = tileState.cornerTile;
+
+	// Compute start to end range that surrounds the seen tiles, but
+	// cuts off where it should at the boundaries of the level.
+	const end = [
+		Math.min(rows, start[0] + MAX_TILE_SPAN),
+		Math.min(cols, start[1] + MAX_TILE_SPAN)
+	]
+
+	// Mark every tiles that exists not seen first.
+	grid.tiles.forEach(function (tile) {
+		tile.material.color.set(COLOR_TILE_OFF);
 	});
 
-	// Update the colors of all the tiles.
-	for (let row = 0; row < rows; row++) {
-		for (let col = 0; col < cols; col++) {
-			const index = row * cols + col;
-			const color = seenMap.has(index) ? COLOR_TILE_ON : COLOR_TILE_OFF;
-			tileState.tiles[index].material.color.set(color);
+	// Mark seen tiles as seen, creating tiles if needed.
+	for (const [row_col_str, value] of tileState.seenMap.entries()) {
+		if (!grid.tiles.has(row_col_str)) {
+			// Okay this is stilly to split, fix this.
+			const parts = row_col_str.split(",");
+			const row = parseInt(parts[0]);
+			const col = parseInt(parts[1]);
+			createOneTile(row, col);
 		}
-	}
-}
-//
-// Draw the tiles (just set the colors right now).
-//
-function updateTiles() {
-	if (SHOW_TILES) {
-		updateTileColors();
-	}
-
-	if (SHOW_VIEW) {
-		moveView();
+		grid.tiles.get(row_col_str).material.color.set(COLOR_TILE_ON);
 	}
 }
 
@@ -376,7 +456,10 @@ function createViewer() {
 
 
 	if (SHOW_VIEW) {
-		tileState.view = createRect(COLOR_VIEW, true);
+		console.log("createView");
+		grid.view = createRect(COLOR_VIEW, true);
+		addToScene(grid.view);
+		//internalParams.tileParent.add(grid.view);
 	}
 
 	if (SHOW_TILES) {
@@ -428,8 +511,6 @@ export function startViewer() {
 
 	defineInternalParams();
 	defineExternalParams();
-
-	defineTileState();
 
 	initScene();
 	createGUI();
