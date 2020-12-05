@@ -59,7 +59,7 @@ If the websocket hop is the slow part, could an [Electron](https://www.electronj
    * Typically hard reload (shift-command-R) in Chrome is enough.
    * Typically do not need to restart napari/webmon unless you changed those.
 
-# Vega-Lite
+## Vega-Lite
 
 * We are using [Vega-Lite](https://vega.github.io/vega-lite/) for viz.
 * You can modify the `.json` files in `static/specs`.
