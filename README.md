@@ -84,7 +84,8 @@ direction, but not there yet.
 # What Can I Do?
 
 * Issues and PR's needed.
-    * Update this README if were stuck on something.
+    * Update this README if you were stuck on something.
+    * Or if you found useful resources for learning.
 * Modify existing pages or create new ones.
    * Use **tailwindcss** and **Vega-Lite** more fully.
    * Use other styles/packages/modules beyond those.
