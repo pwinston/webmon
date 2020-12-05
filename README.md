@@ -85,13 +85,7 @@ bog down. Limit is TBD.
 
 # FAQ
 
-## Why is NAPARI_MON starting two copies of napari?
-## Or what is this error:
-
-```
-An attempt has been made to start a new process before the
-current process has finished its bootstrapping phase.
-```
+## NAPARI_MON is starting two copies of napari?
 
 If you are using your own script to launch napari, make sure you 
 are using the convention:
@@ -114,6 +108,15 @@ The `SharedMemoryManager` forks the main process so it can start a little
 manager process that will talk to remote clients. This second process wants
 the same overall context of the first process, but it runs a little server
 of some sort, it does not want to run napari itself.
+
+## What is this error:
+
+```
+An attempt has been made to start a new process before the
+current process has finished its bootstrapping phase.
+```
+
+Probably the same `__main__` problem as above.
 
 # Future Work
 
