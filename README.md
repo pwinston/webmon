@@ -116,7 +116,7 @@ An attempt has been made to start a new process before the
 current process has finished its bootstrapping phase.
 ```
 
-Probably the same `__main__` problem as above.
+Probably the same `__main__` problem as above. Napari ran a second time, created `SharedMemoryMonitor` a second time. A fork loop basically.
 
 # Future Work
 
