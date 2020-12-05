@@ -11,7 +11,13 @@ See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for
 
 # Screenshots
 
+There are only two pages in the WebUI right now.
+
+## Tile Viewer
+
 ![tiles](https://user-images.githubusercontent.com/4163446/100827155-188b8680-342a-11eb-92bb-217321705947.png)
+
+## ChunkLoader Stats
 
 ![graphs](https://user-images.githubusercontent.com/4163446/100827017-b763b300-3429-11eb-94c0-77c5110dc275.png)
 
