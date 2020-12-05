@@ -152,7 +152,7 @@ Please add more references if you found them useful.
 
 ![tweet](https://user-images.githubusercontent.com/4163446/100826307-090b3e00-3428-11eb-80ca-84c704b3ff5d.png)
 
-## Originally Derived From
+## Webmon was originally derived from
 
 * [FlaskTest](https://github.com/ageller/FlaskTest)
     * A simple demo that combines Flask, Socket-IO, and three.js/WebGL
