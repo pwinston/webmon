@@ -104,6 +104,11 @@ not safe do a second time. The entire main flow the application should only
 come from a `main()` which is only called the first time the process is
 started.
 
+The `SharedMemoryManager` forks the main process so it can start a little
+manager process that will talk to remote clients. This second process wants
+the same overall context of the first process, but it going to run some
+little server, it does not want to run napari itself.
+
 # Future Work
 
 Beyond messages, the Big Kahuna would be using shared memory buffers to
