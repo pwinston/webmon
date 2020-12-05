@@ -131,6 +131,8 @@ and then directly render the data? TBD.
 
 # References
 
+Please add more references if you found them useful.
+
 ## Tailwind CSS
 
 * [Getting Started with Tailwind CSS in 15 Minutes](https://scotch.io/tutorials/get-started-with-tailwind-css-in-15-minutes)
