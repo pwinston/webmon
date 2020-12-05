@@ -62,7 +62,7 @@ direction, but not there yet.
 ## HTML
 
 * [Tailwind CSS](https://tailwindcss.com/) - [GitHub](https://github.com/tailwindlabs/tailwindcss)
-    * Like [bootstrap](getbootstrap.com) but more modern.
+    * Like [bootstrap](https://getbootstrap.com/) but more modern.
     * VS Code extension: [Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
     * The `styles.css` file is trimmed/customized "in production".
 
