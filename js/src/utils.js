@@ -70,23 +70,30 @@ export function setParamsFromURL() {
 	});
 }
 
-//this initializes everything needed for the scene
+//
+// Initialize the Scene.
+//
+// This is called just once when the page is first loaded.
+//
 export function initScene() {
 
-	const screenWidth = window.innerWidth;
-	const screenHeight = window.innerHeight;
-	const aspect = screenWidth / screenHeight;
-
-	// renderer
-	internalParams.renderer = new THREE.WebGLRenderer({
+	// The WebGL Renderer.
+	const renderer = new THREE.WebGLRenderer({
 		antialias: true,
 	});
-	internalParams.renderer.setSize(screenWidth, screenHeight);
 
-	internalParams.container = document.getElementById('WebGLContainer');
-	internalParams.container.appendChild(internalParams.renderer.domElement);
+	// The div/container we are inside.
+	const container = document.getElementById('WebGLContainer');
+	container.appendChild(renderer.domElement);
 
-	// scene
+	// Size based on our container, not the whole screen.
+	renderer.setSize(container.offsetWidth, container.offsetHeight);
+	const aspect = container.offsetWidth / container.offsetHeight;
+
+	internalParams.container = container;
+	internalParams.renderer = renderer;
+
+	// The Scene object.
 	internalParams.scene = new THREE.Scene();
 
 	internalParams.group = new THREE.Group();
