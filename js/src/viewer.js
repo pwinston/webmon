@@ -1,7 +1,10 @@
 //
 // viewer.js
 //
-// WebGL display of which octree tiles are visible in napari.
+// WebGL display of which octree tiles are visible in napari, as well as
+// the current view frustum. The tiles are drawn as a grid of gray
+// rectangles. The view is yellow rectangle. And the one or more tiles that
+// were "seen" by that view are drawn in red.
 //
 import * as THREE from 'three';
 
@@ -15,8 +18,14 @@ const SHOW_AXES = true;  // Draw the axes (red=X green=Y).
 const SHOW_TILES = true;  // Draw the tiles themselves.
 const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
-// MAX_TILE_SPAN is the most tiles we'll show across.
-const MAX_TILE_SPAN = 4;
+// Draw a "context window" of tiles around the seen tiles.
+//
+// The number of tiles on each level goes up quickly: 1, 4, 9, 16, 25, etc.
+// On a big dataset the largest levels might have tens of millions of
+// tiles! For performance reasons we can't draw them all. And even if we
+// could they'd be too small to see. So we only draw a rectangular region
+// of tiles around the seen tiles.
+const CONTEXT_WINDOW = 10;
 
 class ViewerControls {
 	constructor() {
@@ -53,7 +62,7 @@ class TileConfig {
 
 	bigLevel() {
 		return false;
-		return this.maxTileDim > MAX_TILE_SPAN;
+		return this.maxTileDim > CONTEXT_WINDOW;
 	}
 
 	//
@@ -72,6 +81,7 @@ class TileConfig {
 //
 class TileState {
 	constructor(message) {
+		console.log("TileState message:", message);
 		this.message = message;  // The state from napari.
 
 		// seenMap is used later on to set the colors of the tiles.
@@ -97,10 +107,9 @@ class TileState {
 		this.seenMap = seenMap;
 		// console.log("seenMap = ", seenMap.size);
 
-		// Choose corner which is up to MAX_TILE_SPAN/2 less than the real 
-		// corner. So if we draw the grid from that corner, we can see
-		// the sceen tiles.
-		const half = MAX_TILE_SPAN / 2;
+		// We draw some context number of tiles around the seen tiles. Choose
+		// a corner that will show us CONTEXT_WINDOW across total.
+		const half = CONTEXT_WINDOW / 2;
 		this.cornerTile = [
 			Math.max(0, corner[0] - half),
 			Math.max(0, corner[1] - half),
@@ -198,7 +207,7 @@ export function connectSocketInput() {
 
 // Tile colors
 const COLOR_TILE_OFF = 0xa3a2a0; // gray
-const COLOR_TILE_ON = 0xE11313;  // red
+const COLOR_TILE_SEEN = 0xE11313;  // red
 const COLOR_VIEW = 0xF5C542; // yellow
 
 // In a way the tiles are all full size with zero gaps between them,
@@ -275,7 +284,7 @@ function createRect(rectColor, onTop = false) {
 function createTile(pos, size) {
 
 	// Start as COLOR_TILE_OFF, later in updateSeen() we toggle it
-	// between COLOR_TILE_ON and COLOR_TILE_OFF depending on whether it was
+	// between COLOR_TILE_SEEN and COLOR_TILE_OFF depending on whether it was
 	// seen by the view.  
 	var mesh = createRect(COLOR_TILE_OFF);
 	internalParams.tileParent.add(mesh);
@@ -363,8 +372,8 @@ function createTiles() {
 	// Compute start to end range that surrounds the seen tiles, but
 	// cuts of where it should at the whole layer boundaries.
 	const end = [
-		Math.min(rows, start[0] + MAX_TILE_SPAN),
-		Math.min(cols, start[1] + MAX_TILE_SPAN)
+		Math.min(rows, start[0] + CONTEXT_WINDOW),
+		Math.min(cols, start[1] + CONTEXT_WINDOW)
 	]
 
 	// Create tiles in this area. For small levels this will be the entire level,
@@ -406,8 +415,11 @@ function moveView() {
 	moveViewRect(pos, scale)
 }
 
-function moveViewRect(pos, scale) {
-	grid.view.scale.set(...scale);
+//
+// Move the yellow view rectangle to this location with this size.
+//
+function moveViewRect(pos, size) {
+	grid.view.scale.set(...size);
 	grid.view.position.x = pos[0];
 	grid.view.position.y = pos[1];
 	grid.view.position.z = 0;
@@ -434,51 +446,34 @@ function updateSeen() {
 	// Compute start to end range that surrounds the seen tiles, but
 	// cuts off where it should at the boundaries of the level.
 	const end = [
-		Math.min(rows, start[0] + MAX_TILE_SPAN),
-		Math.min(cols, start[1] + MAX_TILE_SPAN)
+		Math.min(rows, start[0] + CONTEXT_WINDOW),
+		Math.min(cols, start[1] + CONTEXT_WINDOW)
 	]
 
-	// Mark every tiles that exists not seen first.
+	// Mark every tile as not seen first.
 	grid.tiles.forEach(function (tile) {
 		tile.material.color.set(COLOR_TILE_OFF);
 	});
 
-	// Mark seen tiles as seen, creating tiles if needed.
+	// Mark every seen tile as seen. We create tiles as needed, since
+	// we might be seeing an area where no tile exits yet.
 	for (const [row_col_str, value] of tileState.seenMap.entries()) {
 		if (!grid.tiles.has(row_col_str)) {
-			// Okay this is stilly to split, fix this.
+			// Map key can't be a tuple, so use a string (silly).
 			const parts = row_col_str.split(",");
 			const row = parseInt(parts[0]);
 			const col = parseInt(parts[1]);
 			createOneTile(row, col);
 		}
-		grid.tiles.get(row_col_str).material.color.set(COLOR_TILE_ON);
+		grid.tiles.get(row_col_str).material.color.set(COLOR_TILE_SEEN);
 	}
 }
 
-// 
-// Only called on startup, after that we modify things on the fly.
 //
-function createViewer() {
-
-	internalParams.group.position.y = 1;
-	internalParams.group.scale.set(1, -1, 1);
-
-
-	if (SHOW_VIEW) {
-		console.log("createViewer");
-		grid.view = createRect(COLOR_VIEW, true);
-		addToScene(grid.view);
-		//internalParams.tileParent.add(grid.view);
-	}
-
-	if (SHOW_TILES) {
-		createTiles();
-	}
-
-	if (SHOW_AXES)
-		createAxes();
-
+// Have not touched this from original 3D demo, not sure what "lighting"
+// we need for our 2D ortho display, if any.
+//
+function addLights() {
 	var lights = [];
 	lights[0] = new THREE.PointLight(0xffffff, 1, 0);
 	lights[0].position.set(0, 200, 0);
@@ -488,8 +483,39 @@ function createViewer() {
 	});
 }
 
+// 
+// Create the viewer on startup.
 //
-// Animation loop. Not using this yet?
+function createViewer() {
+
+	// Position/scale the group so the axes are like napari. A scale of -1
+	// on Y inverts that axis so +Y goes down the screen. 
+	//
+	// *---> X
+	// |
+	// Y
+	//
+	internalParams.group.position.y = 1;
+	internalParams.group.scale.set(1, -1, 1);
+
+	if (SHOW_VIEW) {
+		grid.view = createRect(COLOR_VIEW, true);
+		addToScene(grid.view);
+	}
+
+	if (SHOW_TILES) {
+		createTiles();
+	}
+
+	if (SHOW_AXES)
+		createAxes();
+
+	addLights();
+}
+
+//
+// Animation loop. Not using this yet? But could be useful, so just 
+// leaving it here as a reference.
 //
 function animateViewer(time) {
 	requestAnimationFrame(animateViewer);
@@ -497,6 +523,9 @@ function animateViewer(time) {
 	internalParams.renderer.render(internalParams.scene, internalParams.camera);
 }
 
+//
+// Controls are HTML form controls. We hook to them.
+//
 function setupControls() {
 	const showGrid = document.getElementById('showGrid');
 	showGrid.addEventListener('change', event => {
