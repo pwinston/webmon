@@ -1,35 +1,19 @@
 {% extends "base.html" %}
 {% block content %}
 
-<style>
-	.webgl {
-		height: 800px
-	}
-</style>
-
-<header class="bg-white shadow">
-	<div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-		<h1 class="text-3xl font-bold leading-tight text-gray-900">
-			Viewer
-		</h1>
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+	<div class="p-8">
+		<input type="checkbox" id="showGrid" checked>
+		<label for="ShowGrid">Show Grid</label><br>
+		<label for="selectLoad">TiledImageVisual Load:</label>
+		<select id="selectLoad" form="tiledImageVisual">
+			<option value="manual">Manual</option>
+			<option value="one">One</option>
+			<option value="all">All</option>
+		</select>
 	</div>
-</header>
-<main>
-	<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-		<!-- Viewer Content -->
-		<div class="p-8">
-			<input type="checkbox" id="showGrid" checked>
-			<label for="ShowGrid">Show Grid</label><br>
-			<label for="selectLoad">TiledImageVisual Load:</label>
-			<select id="selectLoad" form="tiledImageVisual">
-				<option value="manual">Manual</option>
-				<option value="one">One</option>
-				<option value="all">All</option>
-			</select>
-		</div>
-		<div id="WebGLContainer" class="webgl"></div>
-	</div>
-</main>
+	<div id="WebGLContainer" class="webgl"></div>
+</div>
 
 
 <script type="module">

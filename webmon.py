@@ -21,7 +21,7 @@ from typing import Optional
 
 import click
 import requests
-from flask import Flask, render_template
+from flask import Flask, render_template, abort
 from flask_socketio import SocketIO
 
 from bridge import NapariBridge
@@ -67,24 +67,18 @@ ASYNC_MODE = "eventlet"
 # Flask-SocketIO.
 socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
 
+pages = [
+    "viewer",
+    "loader",
+    "blank",
+]
 
-@app.route("/viewer")
-def viewer():
-    """The tile viewer page."""
-    return render_template("viewer.html")
-
-
-@app.route("/loader")
-def loader():
-    """The ChunkLoader page"""
-    return render_template("loader.html")
-
-
-@app.route("/blank")
-def blank():
-    """Black page as ane example how to expand."""
-    return render_template("blank.html")
-
+@app.route('/<page_name>')
+def show_page(page_name):
+    if page_name in pages:
+        routes = [dict(href=f"/{page}", name=page.capitalize(), active=page==page_name) for page in pages]
+        return render_template(f"{page_name}.html", routes=routes)
+    abort(404)
 
 @app.route("/stop")
 def stop():
