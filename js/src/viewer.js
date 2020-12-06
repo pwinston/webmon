@@ -127,7 +127,6 @@ class TileCorners {
 //
 class TileState {
 	constructor(message) {
-		console.log("TileState message:", message);
 		this.message = message;  // The message from napari.
 
 		// seenMap so we can quickly set the colors of the tiles.
