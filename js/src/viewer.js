@@ -7,6 +7,7 @@
 // were "seen" by that view are drawn in red.
 //
 import * as THREE from 'three';
+import { GridHelper } from 'three';
 
 import {
 	internalParams,
@@ -18,14 +19,22 @@ const SHOW_AXES = true;  // Draw the axes (red=X green=Y).
 const SHOW_TILES = true;  // Draw the tiles themselves.
 const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
-// Draw a "context window" of tiles around the seen tiles.
+// We can't (?) use a [row, col] pair as the key. Because of how Javascript
+// compares lists. So we create a comma-separate string for each pair of
+// coordinates, like "4,23". Kind of silly, but it works fine.
+function gridKey(row, col) {
+	return [row, col].join(",");
+}
+
+// Draw a border of CONTEXT_BORDER tiles around the seen tiles.
 //
 // The number of tiles on each level goes up quickly: 1, 4, 9, 16, 25, etc.
+//
 // On a big dataset the largest levels might have tens of millions of
 // tiles! For performance reasons we can't draw them all. And even if we
-// could they'd be too small to see. So we only draw a rectangular region
-// of tiles around the seen tiles.
-const CONTEXT_WINDOW = 10;
+// could they'd be too small to see. So we only draw the scene tiles
+// and context border around them.
+const CONTEXT_BORDER = 5;
 
 class ViewerControls {
 	constructor() {
@@ -60,11 +69,6 @@ class TileConfig {
 		this.maxLevelDim = Math.max(this.levelShape[0], this.levelShape[1]);
 	}
 
-	bigLevel() {
-		return false;
-		return this.maxTileDim > CONTEXT_WINDOW;
-	}
-
 	//
 	// Return the normalized [0..1] position of this [row, col] tileCoord.
 	//
@@ -77,44 +81,101 @@ class TileConfig {
 }
 
 //
-// Which tiles were seen and the corners (for the view).
+// Return the [min, max] tile corners of the seen tiles.
+//
+function findCorners(seenTiles) {
+	const max_int = Number.MAX_SAFE_INTEGER;
+	const min_int = -Number.MAX_SAFE_INTEGER;
+	var min = [max_int, max_int];
+	var max = [min_int, min_int];
+
+	seenTiles.forEach(function ([row, col]) {
+		min = [
+			Math.min(min[0], row),
+			Math.min(min[1], col)
+		];
+
+		max = [
+			Math.max(max[0], row),
+			Math.max(max[1], col)
+		];
+	});
+
+	return [min, max];
+}
+
+// 
+// Find and store this.min and this.max corners of the seen tiles.
+//
+class TileCorners {
+	constructor(seenTiles) {
+		const corners = findCorners(seenTiles);
+		this.min = corners[0];
+		this.max = corners[1]
+	}
+
+	equal(other) {
+		return this.min[0] == other.min[0] &&
+			this.min[1] == other.min[1] &&
+			this.max[0] == other.max[0] &&
+			this.max[1] == other.max[1];
+	}
+}
+
+//
+// Stores the tiles that were seen and the corners of the seen tiles.
 //
 class TileState {
 	constructor(message) {
 		console.log("TileState message:", message);
-		this.message = message;  // The state from napari.
+		this.message = message;  // The message from napari.
 
-		// seenMap is used later on to set the colors of the tiles.
+		// seenMap so we can quickly set the colors of the tiles.
 		var seenMap = new Map();
 
-		// Compute the "corner" of the seen tiles, the lowest row/col seen.
-		const max = Number.MAX_SAFE_INTEGER;
-		var corner = [max, max];
+		// Find the min/max coners of the seen tiles.
+		this.seenCorners = new TileCorners(this.message.seen);
 
-		// console.log("seen = ", this.message.seen);
-
+		// Populate the seen map.
 		this.message.seen.forEach(function (coord) {
-			// Map keys can't really be arrays, so use a string.
-			const str = coord.join(',');
-			seenMap.set(str, 1);
-
-			corner = [
-				Math.min(corner[0], coord[0]),
-				Math.min(corner[1], coord[1])
-			];
+			const key = gridKey(coord[0], coord[1]);
+			seenMap.set(key, 1);
 		});
 
 		this.seenMap = seenMap;
 		// console.log("seenMap = ", seenMap.size);
-
-		// We draw some context number of tiles around the seen tiles. Choose
-		// a corner that will show us CONTEXT_WINDOW across total.
-		const half = CONTEXT_WINDOW / 2;
-		this.cornerTile = [
-			Math.max(0, corner[0] - half),
-			Math.max(0, corner[1] - half),
-		];
 	};
+
+	// Return true if this tile was seen.
+	wasSeen(row, col) {
+		return this.seenMap.has(gridKey(row, col));
+	}
+
+	// Return min corner of the context window as [row, col].
+	getContextMin() {
+		const min = tileState.seenCorners.min;
+
+		return [
+			Math.max(0, min[0] - CONTEXT_BORDER),
+			Math.max(0, min[1] - CONTEXT_BORDER)
+		];
+	}
+
+	// Return max corner of the context window as [row, col].
+	getContextMax() {
+		var rows = tileConfig.tileShape[0];
+		var cols = tileConfig.tileShape[1];
+		const max = tileState.seenCorners.max;
+
+		return [
+			Math.min(rows, max[0] + CONTEXT_BORDER),
+			Math.min(cols, max[1] + CONTEXT_BORDER)
+		];
+	}
+
+	equal(other) {
+		return this.seenCorners.equal(other.seenCorners);
+	}
 }
 
 //
@@ -126,6 +187,52 @@ class Grid {
 		this.view = null;
 	};
 
+	// Add a tile to the grid.
+	addTile(row, col, mesh) {
+		this.tiles.set(gridKey(row, col), mesh);
+	}
+
+	// Return true if this tile exits.
+	exists(row, col) {
+		return this.tiles.has(gridKey(row, col));
+	}
+
+	// 
+	// Set the color of this tile.
+	// Create the tile if it doesn't already exist.
+	//
+	setTileColor(row, col, color) {
+		if (this.exists(row, col)) {
+			this.setColor(row, col, color);
+			return;
+		}
+
+		console.log("createOneTile row, col = ", row, col);
+		createOneTile(row, col, color);
+	}
+
+	// Set the color of a tile. The tile must already exist.
+	setColor(row, col, color) {
+		const tile = this.tiles.get(gridKey(row, col));
+		tile.material.color.set(color);
+	}
+
+	// Mark all our tiles as unseen.
+	clearSeen() {
+		this.tiles.forEach(function (tile) {
+			tile.material.color.set(COLOR_TILE_OFF);
+		});
+	}
+
+	// Remove all our tiles.
+	removeAll() {
+		this.tiles.forEach(function (tile) {
+			internalParams.tileParent.remove(tile);
+		})
+		this.tiles = new Map();
+	}
+
+	// Update to reflect the most recent messages from the server.
 	update() {
 		if (SHOW_TILES) {
 			updateSeen();
@@ -154,10 +261,18 @@ var tileState = new TileState({
 	corners: [[0, 0], [1, 1]]
 });
 
+
 //
-// webmon sent us some data.
+// Server sent us some data.
 //
 function setTileData(msg) {
+	const newState = new TileState(msg.tile_state);
+
+	if (tileState && newState.equal(tileState)) {
+		// Same state. Don't waste time and console spam.
+		return;
+	}
+
 	tileState = new TileState(msg.tile_state);
 
 	// Only create tiles if level changed. Because toggling colors is cheaper
@@ -166,7 +281,7 @@ function setTileData(msg) {
 		tileConfig = new TileConfig(msg.tile_config);
 
 		if (SHOW_TILES) {
-			createTiles();
+			grid.removeAll();
 		}
 	}
 
@@ -281,12 +396,9 @@ function createRect(rectColor, onTop = false) {
 //
 // Create and return one tile, a rectangular mesh. 
 //
-function createTile(pos, size) {
+function createTileMesh(pos, size, initialColor) {
 
-	// Start as COLOR_TILE_OFF, later in updateSeen() we toggle it
-	// between COLOR_TILE_SEEN and COLOR_TILE_OFF depending on whether it was
-	// seen by the view.  
-	var mesh = createRect(COLOR_TILE_OFF);
+	var mesh = createRect(initialColor);
 	internalParams.tileParent.add(mesh);
 
 	// Shrink it down a bit to create a small gap between tiles.
@@ -307,7 +419,10 @@ function createTile(pos, size) {
 	return mesh;
 }
 
-function createOneTile(row, col) {
+//
+// Create a single tile for the grid.
+///
+function createOneTile(row, col, initialColor) {
 
 	// Use longer dimension so it fits in our [0..1] space. 
 	const maxLevelDim = tileConfig.maxLevelDim;
@@ -333,57 +448,8 @@ function createOneTile(row, col) {
 	// Position in (x, y) [0..1] coordinates.
 	const pos = [posLevel[1] / maxLevelDim, posLevel[0] / maxLevelDim];
 
-	const row_col_str = [row, col].join(",");
-	grid.tiles.set(row_col_str, createTile(pos, size));
-}
-
-//
-// Create all the tile meshes.
-//
-function createTiles() {
-	console.log("createTiles");
-
-	// Remove all the old ones for now, we could re-use them to minimize
-	// the number of mesh creations, but does it matter?
-	grid.tiles.forEach(function (tile) {
-		internalParams.tileParent.remove(tile);
-	})
-
-	// Start over with no tiles.
-	grid.tiles = new Map();
-
-	if (tileConfig.bigLevel()) {
-		return; // nothing for now
-	}
-
-	const fullRows = tileConfig.tileShape[0];
-	const fullCols = tileConfig.tileShape[1];
-
-	console.log(`Full tile shape ${fullRows} x ${fullCols}`);
-
-	const rows = tileConfig.tileShape[0];
-	const cols = tileConfig.tileShape[1];
-	const tileSize = tileConfig.tileSize;
-
-	console.log(`Create tiles ${rows} x ${cols}`);
-
-	const start = tileState.cornerTile;
-
-	// Compute start to end range that surrounds the seen tiles, but
-	// cuts of where it should at the whole layer boundaries.
-	const end = [
-		Math.min(rows, start[0] + CONTEXT_WINDOW),
-		Math.min(cols, start[1] + CONTEXT_WINDOW)
-	]
-
-	// Create tiles in this area. For small levels this will be the entire level,
-	// for large levels this will be at most a [-MAX_TILE_DIM..MAX_TILE_DIM]
-	// region.
-	for (let row = start[0]; row < end[0]; row++) {
-		for (let col = start[1]; col < end[1]; col++) {
-			createOneTile(row, col);
-		}
-	}
+	const mesh = createTileMesh(pos, size, initialColor)
+	grid.addTile(row, col, mesh);
 }
 
 //
@@ -393,22 +459,24 @@ function createTiles() {
 function moveView() {
 	const normPos = [0, 0]; //tileConfig.normPos(tileState.cornerTile);
 
+	// Get the maxDim in base image pixels (data coordinates).
 	const baseX = tileConfig.baseShape[1];
 	const baseY = tileConfig.baseShape[0];
-
 	const maxDim = Math.max(baseX, baseY);
 
+	// Corners of the view in data coordinates.
 	const corners = tileState.message.corners;
 	const x0 = corners[0][1] / maxDim - normPos[1];
 	const y0 = corners[0][0] / maxDim - normPos[0];
 	const x1 = corners[1][1] / maxDim - normPos[1];
 	const y1 = corners[1][0] / maxDim - normPos[0];
 
+	// Width/heigh of the view.
 	const width = x1 - x0;
 	const height = y1 - y0;
 
-	// pos is the *center* of the rectangle so offset it by half the
-	// height/width.
+	// The rectange position is the *center* of the rectangle. So we need
+	// to offset it by half the height/width.
 	const pos = [x0 + width / 2, y0 + height / 2];
 	const scale = [width, height];
 
@@ -434,38 +502,26 @@ function updateSeen() {
 	// internalParams.tileParent.position.x = -normPos[1];
 	//internalParams.tileParent.position.y = -normPos[0];
 
-	if (tileConfig.bigLevel()) {
-		return;
-	}
+	// We create/update tiles in the whole context window.
+	const start = tileState.getContextMin();
+	const end = tileState.getContextMax();
 
-	var rows = tileConfig.tileShape[0];
-	var cols = tileConfig.tileShape[1];
+	// Mark every tile as not seen first. These might be far outside the
+	// context window, if we've been panning around. Eventually might
+	// want to "garbage collect" tiles which are far in the past.
+	grid.clearSeen();
 
-	const start = tileState.cornerTile;
-
-	// Compute start to end range that surrounds the seen tiles, but
-	// cuts off where it should at the boundaries of the level.
-	const end = [
-		Math.min(rows, start[0] + CONTEXT_WINDOW),
-		Math.min(cols, start[1] + CONTEXT_WINDOW)
-	]
-
-	// Mark every tile as not seen first.
-	grid.tiles.forEach(function (tile) {
-		tile.material.color.set(COLOR_TILE_OFF);
-	});
-
-	// Mark every seen tile as seen. We create tiles as needed, since
-	// we might be seeing an area where no tile exits yet.
-	for (const [row_col_str, value] of tileState.seenMap.entries()) {
-		if (!grid.tiles.has(row_col_str)) {
-			// Map key can't be a tuple, so use a string (silly).
-			const parts = row_col_str.split(",");
-			const row = parseInt(parts[0]);
-			const col = parseInt(parts[1]);
-			createOneTile(row, col);
+	// Iterate through every tile in the context window, creating tiles as
+	// needed. Mark existing and new tiles with the right color.
+	for (let row = start[0]; row < end[0]; row++) {
+		for (let col = start[1]; col < end[1]; col++) {
+			// For every tile in the context window, set it as seen or not
+			// seen. This will create tiles if they don't exist yet. So
+			// there is like this trail of created tiles as we pan around.
+			const seen = tileState.wasSeen(row, col);
+			const color = seen ? COLOR_TILE_SEEN : COLOR_TILE_OFF;
+			grid.setTileColor(row, col, color)
 		}
-		grid.tiles.get(row_col_str).material.color.set(COLOR_TILE_SEEN);
 	}
 }
 
@@ -501,10 +557,6 @@ function createViewer() {
 	if (SHOW_VIEW) {
 		grid.view = createRect(COLOR_VIEW, true);
 		addToScene(grid.view);
-	}
-
-	if (SHOW_TILES) {
-		createTiles();
 	}
 
 	if (SHOW_AXES)
