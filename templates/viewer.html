@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 
+<style>
+	.webgl {
+		height: 800px
+	}
+</style>
+
 <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
 	<div class="p-8">
 		<input type="checkbox" id="showGrid" checked>
@@ -12,9 +18,11 @@
 			<option value="all">All</option>
 		</select>
 	</div>
-	<div id="WebGLContainer" class="webgl"></div>
 </div>
 
+<div class="overflow-hidden	">
+	<div id="WebGLContainer" class=webgl></div>
+</div>
 
 <script type="module">
 	import { startViewer } from '/static/viewer.js';
