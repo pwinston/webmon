@@ -164,14 +164,14 @@ class NapariClient(Thread):
         final cleanup.
         """
         if self._remote.napari_shutting_down.is_set():
-            LOGGER.info("NapariClient: napari signaled shutdown.")
+            LOGGER.info("NapariClient: napari is shutting down.")
             return False  # Stop polling.
 
         # Do we need to copy here? Otherwise are we referring directly to
-        # the version in shared memory? That might might be good: no
-        # copy unless we really reference the data? But could it change out
-        # from under us? Do we care as long as it's done safely, we get
-        # the latest?
+        # the version in shared memory? That might might be good: no copy
+        # unless we really reference the data? But could it change out from
+        # under us? Do we care as long as it's done safely, and we get the
+        # latest version?
         self.napari_data['tile_data'] = {
             "tile_config": self._remote.data.get('tile_config'),
             "tile_state": self._remote.data.get('tile_state'),
