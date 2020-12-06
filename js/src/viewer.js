@@ -504,7 +504,7 @@ function setupControls() {
 		viewerControls.send();
 	});
 
-	const selectCar = document.getElementById('selectCar');
+	const selectCar = document.getElementById('selectLoad');
 	selectCar.onchange = function () {
 		alert(selectCar.value);
 	}
