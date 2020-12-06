@@ -20,6 +20,7 @@ export function defineInternalParams() {
 		this.scene = null;
 		this.group = null;
 		this.tileParent = null;
+		this.camera = null;
 
 		//for frustum      
 		this.zmax = 5.e10;
@@ -55,6 +56,41 @@ export function getURLvars() {
 	return vars;
 }
 
+function createCamera(aspect) {
+	const height = 1;
+	const width = height * aspect;
+	const near = 0;
+	const far = 1;
+
+	return new THREE.OrthographicCamera(0, width, height, 0, near, far);
+}
+
+function resizeToContainer(container) {
+	if (internalParams.camera) {
+		internalParams.scene.remove(internalParams.camera)
+	}
+
+	const width = container.offsetWidth;
+	const height = container.offsetHeight;
+
+	// Size based on our container, not the whole screen.
+	internalParams.renderer.setSize(width, height);
+	const aspect = width / height;
+
+	const camera = createCamera(aspect);
+	camera.zoom = ZOOM;
+	camera.updateProjectionMatrix();
+
+	internalParams.scene.add(camera);
+	internalParams.camera = camera
+
+	internalParams.renderer.setSize(width, height);
+}
+
+function getContainer() {
+	return document.getElementById('WebGLContainer');
+}
+
 //
 // Initialize the Scene.
 //
@@ -67,13 +103,9 @@ export function initScene() {
 		antialias: true,
 	});
 
-	// The div/container we are inside.
-	const container = document.getElementById('WebGLContainer');
+	// Put the renderer into the DOM.
+	const container = getContainer();
 	container.appendChild(renderer.domElement);
-
-	// Size based on our container, not the whole screen.
-	renderer.setSize(container.offsetWidth, container.offsetHeight);
-	const aspect = container.offsetWidth / container.offsetHeight;
 
 	internalParams.container = container;
 	internalParams.renderer = renderer;
@@ -87,29 +119,12 @@ export function initScene() {
 	internalParams.tileParent = new THREE.Group();
 	internalParams.group.add(internalParams.tileParent);
 
-	const height = 1;
-	const width = height * aspect;
-	const near = 0;
-	const far = 1;
+	resizeToContainer(container);
 
-	// Camera
-	var camera = new THREE.OrthographicCamera(
-		0, width, height, 0, near, far);
-	internalParams.scene.add(camera);
-	camera.zoom = ZOOM;
-	camera.updateProjectionMatrix();
-
-	internalParams.camera = camera
-
-	// events
 	const onWindowResize = () => {
-		// https://github.com/mrdoob/three.js/issues/69
-		internalParams.camera.aspect = window.innerWidth / window.innerHeight;
-		internalParams.camera.updateProjectionMatrix();
-		internalParams.renderer.setSize(window.innerWidth, window.innerHeight);
+		resizeToContainer(getContainer());
 	}
 	window.addEventListener('resize', onWindowResize, false);
 
-	//controls
 	internalParams.controls = new TrackballControls(internalParams.camera, internalParams.renderer.domElement);
 }
