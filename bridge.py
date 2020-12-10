@@ -30,72 +30,96 @@ class NapariBridge:
 
     Attributes
     ----------
-    commands : Queue
+    _commands : Queue
         set_command() puts command into this queue.
     """
 
     def __init__(self, socketio: SocketIO, client: NapariClient):
-        self.socketio = socketio
-        self.client = client
-        self.commands = Queue()
+        self._socketio = socketio
+        self._client = client
+        self._commands = Queue()
 
-    def send_command(self, command) -> None:
-        """Put into queue for background_task to send."""
-        self.commands.put(command)
+    def send_command(self, command: dict) -> None:
+        """Set this command to napari.
+
+        Put the given command into the self._commands queue. The background
+        task will send it to napari.
+
+        Parameters
+        ----------
+        command : dict
+            The command to send to napari.
+        """
+        self._commands.put(command)
 
     def start_background_task(self) -> Thread:
-        """Start our background task."""
-        return self.socketio.start_background_task(target=self._task)
+        """Start our background task.
 
-    def _task(self) -> None:
-        """Send data to/from the viewer and napari."""
-        tid = get_ident()
-        LOGGER.info("Webmon: Background task thread_id=%d", tid)
+        Return
+        ------
+        Thread
+            A Thread-compatible object.
+        """
+        return self._socketio.start_background_task(
+            target=self._background_task
+        )
+
+    def _background_task(self) -> None:
+        """Background task that shuttled data to/from napari and the WebUI."""
+        LOGGER.info("Webmon: Start background task thread_id=%d", get_ident())
 
         while True:
             # LOGGER.info("Sleeping %f", poll_seconds)
-            self.socketio.sleep(POLL_INTERVAL_SECONDS)
+            self._socketio.sleep(POLL_INTERVAL_SECONDS)
 
-            self._send_commands()  # Send any pending commands.
+            # Empty the self._commands queue, sending commmands to napari.
+            self._send_commands_to_napari()
 
             # We just send the whole thing every time right now. Need
-            # a good way to avoid sending redundant/identical data.
-            if self.client is not None:
-                tile_data = self.client.napari_data['tile_data']
-                self.socketio.emit(
+            # a good way to avoid sending redundant/identical data?
+            if self._client is not None:
+
+                # Get latest data from the client.
+                tile_data = self._client.napari_data['tile_data']
+
+                print(f"tile_data: {tile_data}")
+
+                # Send it to the viewer.
+                self._socketio.emit(
                     'set_tile_data', tile_data, namespace='/test'
                 )
 
-            self._process_messages()
+            self._process_messages_from_napari()
 
-    def _send_commands(self) -> None:
-        """Send all pending commands."""
+    def _send_commands_to_napari(self) -> None:
+        """Send all pending commands to napari."""
         while True:
             try:
-                command = self.commands.get_nowait()
+                command = self._commands.get_nowait()
             except Empty:
-                break  # No more commands to send.
+                return  # No more commands to send.
 
-            if self.client is None:
-                LOGGER.info("Send Command (no client): %s", command)
+            if self._client is None:
+                LOGGER.warning("Cannot send command (no client): %s", command)
             else:
-                self.client.send_command(command)
+                self._client.send_command(command)
 
-    def _process_messages(self) -> None:
+    def _process_messages_from_napari(self) -> None:
         """Process message from napari."""
-        if self.client is None:
+        if self._client is None:
             return
 
         while True:
-            message = self.client.get_napari_message()
+            message = self._client.get_napari_message()
 
             if message is None:
                 return  # No more messages.
 
             try:
+                # Send the message to the web client.
                 data = message['load']
                 LOGGER.info("send_load_data: %s", json.dumps(data))
-                self.socketio.emit('send_load_data', data, namespace='/test')
+                self._socketio.emit('send_load_data', data, namespace='/test')
             except KeyError:
                 LOGGER.info(
                     "Ignoring unknown message: %s", json.dumps(message)

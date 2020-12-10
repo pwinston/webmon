@@ -104,7 +104,7 @@ function findCorners(seenTiles) {
 	return [min, max];
 }
 
-// 
+//
 // Find and store this.min and this.max corners of the seen tiles.
 //
 class TileCorners {
@@ -127,6 +127,7 @@ class TileCorners {
 //
 class TileState {
 	constructor(message) {
+		console.log(message);
 		this.message = message;  // The message from napari.
 
 		// seenMap so we can quickly set the colors of the tiles.
@@ -196,7 +197,7 @@ class Grid {
 		return this.tiles.has(gridKey(row, col));
 	}
 
-	// 
+	//
 	// Set the color of this tile.
 	// Create the tile if it doesn't already exist.
 	//
@@ -333,7 +334,7 @@ function addToScene(object) {
 }
 
 //
-// Draw a single thin line. 
+// Draw a single thin line.
 //
 // All lines are one pixel wide. There is a line width option but docs say
 // it does nothing in most renderers. And it seemed to do nothing for us.
@@ -365,7 +366,7 @@ function createAxes() {
 }
 
 //
-// Create a 1x1 rectangle with center at (0, 0) so we can 
+// Create a 1x1 rectangle with center at (0, 0) so we can
 // scale/move it into position.
 //
 function createRect(rectColor, onTop = false) {
@@ -393,7 +394,7 @@ function createRect(rectColor, onTop = false) {
 }
 
 //
-// Create and return one tile, a rectangular mesh. 
+// Create and return one tile, a rectangular mesh.
 //
 function createTileMesh(pos, size, initialColor) {
 
@@ -423,7 +424,7 @@ function createTileMesh(pos, size, initialColor) {
 ///
 function createOneTile(row, col, initialColor) {
 
-	// Use longer dimension so it fits in our [0..1] space. 
+	// Use longer dimension so it fits in our [0..1] space.
 	const maxLevelDim = tileConfig.maxLevelDim;
 
 	const levelRows = tileConfig.levelShape[0];
@@ -538,13 +539,13 @@ function addLights() {
 	});
 }
 
-// 
+//
 // Create the viewer on startup.
 //
 function createViewer() {
 
 	// Position/scale the group so the axes are like napari. A scale of -1
-	// on Y inverts that axis so +Y goes down the screen. 
+	// on Y inverts that axis so +Y goes down the screen.
 	//
 	// *---> X
 	// |
@@ -565,7 +566,7 @@ function createViewer() {
 }
 
 //
-// Animation loop. Not using this yet? But could be useful, so just 
+// Animation loop. Not using this yet? But could be useful, so just
 // leaving it here as a reference.
 //
 function animateViewer(time) {
