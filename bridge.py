@@ -1,11 +1,13 @@
 """NapariBridge class.
 
-Communicates between the Flask-SocketIO app and the NapariClient.
+Communicates between the webmon.py (the Flask-SocketIO app) and the
+NapariClient (the napari shared memory client).
 """
 import json
 import logging
 from queue import Empty, Queue
 from threading import Thread, get_ident
+from typing import Optional
 
 from flask_socketio import SocketIO
 
@@ -38,6 +40,7 @@ class NapariBridge:
         self._socketio = socketio
         self._client = client
         self._commands = Queue()
+        self._frame_number = 0
 
     def send_command(self, command: dict) -> None:
         """Set this command to napari.
@@ -65,31 +68,59 @@ class NapariBridge:
         )
 
     def _background_task(self) -> None:
-        """Background task that shuttled data to/from napari and the WebUI."""
+        """Background task that shuttles data to/from napari and the WebUI."""
         LOGGER.info("Webmon: Start background task thread_id=%d", get_ident())
 
         while True:
+            self._frame_number += 1
+
             # LOGGER.info("Sleeping %f", poll_seconds)
             self._socketio.sleep(POLL_INTERVAL_SECONDS)
 
-            # Empty the self._commands queue, sending commmands to napari.
-            self._send_commands_to_napari()
-
-            # We just send the whole thing every time right now. Need
-            # a good way to avoid sending redundant/identical data?
-            if self._client is not None:
-
-                # Get latest data from the client.
-                tile_data = self._client.napari_data['tile_data']
-
-                print(f"tile_data: {tile_data}")
-
-                # Send it to the viewer.
-                self._socketio.emit(
-                    'set_tile_data', tile_data, namespace='/test'
-                )
+            if self._client is None:
+                continue  # Can't do much without a client.
 
             self._process_messages_from_napari()
+
+            # Send the tile data from napari to the WebUI.
+            self._emit_tile_data()
+
+            # Send queued commands to napari.
+            self._send_commands_to_napari()
+
+    def _emit_tile_data(self) -> None:
+        """Emit the tile data to the web client."""
+        try:
+            tile_data = self._get_tile_data()
+        except KeyError:
+            LOGGER.error("KeyError with")
+            return  # No data or format was not as expected.
+
+        # Send it to the viewer.
+        LOGGER.info("emit: set_tile_data %d", self._frame_number)
+        self._socketio.emit('set_tile_data', tile_data, namespace='/test')
+
+    def _get_tile_data(self) -> Optional[dict]:
+        """Return the latest tile data from napari.
+
+        Return
+        ------
+        Optional[dict]
+            The data for napari or None if there was none.
+        """
+        poll_data = self._client.get_napari_data("poll")
+        if poll_data is None:
+            return None
+
+        layers = poll_data['layers']
+        for _key, layer_data in layers.items():
+            # Right now we just return the first octree layer's data. Once
+            # the viewer can deal with it, we can send all the layers, and
+            # it can offer some type of menu to choose with layer to
+            # display tiles for.
+            return layer_data
+
+        return None  # No layers?
 
     def _send_commands_to_napari(self) -> None:
         """Send all pending commands to napari."""
@@ -102,15 +133,12 @@ class NapariBridge:
             if self._client is None:
                 LOGGER.warning("Cannot send command (no client): %s", command)
             else:
-                self._client.send_command(command)
+                self._client.send_message(command)
 
     def _process_messages_from_napari(self) -> None:
-        """Process message from napari."""
-        if self._client is None:
-            return
-
+        """Process messages from napari."""
         while True:
-            message = self._client.get_napari_message()
+            message = self._client.get_one_napari_message()
 
             if message is None:
                 return  # No more messages.

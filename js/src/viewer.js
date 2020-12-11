@@ -19,6 +19,8 @@ const SHOW_AXES = true;  // Draw the axes (red=X green=Y).
 const SHOW_TILES = true;  // Draw the tiles themselves.
 const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
+var frame = 0;
+
 // We can't (?) use a [row, col] pair as the key. Because of how Javascript
 // compares lists. So we create a comma-separate string for each pair of
 // coordinates, like "4,23". Kind of silly, but it works fine.
@@ -42,7 +44,6 @@ class ViewerControls {
 	}
 
 	send() {
-		console.log('send()', this);
 		internalParams.socket.emit('send_command', this);
 	}
 }
@@ -107,18 +108,13 @@ function findCorners(seenTiles) {
 //
 // Find and store this.min and this.max corners of the seen tiles.
 //
-class TileCorners {
+// These are the corner of the seen tiles, not the view frustum corners.
+//
+class SeenTileCorners {
 	constructor(seenTiles) {
 		const corners = findCorners(seenTiles);
 		this.min = corners[0];
-		this.max = corners[1]
-	}
-
-	equal(other) {
-		return this.min[0] == other.min[0] &&
-			this.min[1] == other.min[1] &&
-			this.max[0] == other.max[0] &&
-			this.max[1] == other.max[1];
+		this.max = corners[1];
 	}
 }
 
@@ -127,14 +123,13 @@ class TileCorners {
 //
 class TileState {
 	constructor(message) {
-		console.log(message);
 		this.message = message;  // The message from napari.
 
 		// seenMap so we can quickly set the colors of the tiles.
 		var seenMap = new Map();
 
 		// Find the min/max coners of the seen tiles.
-		this.seenCorners = new TileCorners(this.message.seen);
+		this.seenCorners = new SeenTileCorners(this.message.seen);
 
 		// Populate the seen map.
 		this.message.seen.forEach(function (coord) {
@@ -143,7 +138,6 @@ class TileState {
 		});
 
 		this.seenMap = seenMap;
-		// console.log("seenMap = ", seenMap.size);
 	};
 
 	// Return true if this tile was seen.
@@ -174,7 +168,7 @@ class TileState {
 	}
 
 	equal(other) {
-		return this.seenCorners.equal(other.seenCorners);
+		return this.message.corners == other.message.corners;
 	}
 }
 
@@ -207,7 +201,6 @@ class Grid {
 			return;
 		}
 
-		console.log("createOneTile row, col = ", row, col);
 		createOneTile(row, col, color);
 	}
 

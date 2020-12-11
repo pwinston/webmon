@@ -55,11 +55,11 @@ class NapariRemoteAPI(NamedTuple):
     @classmethod
     def from_manager(cls, manager):
         return cls(
-            manager.napari_messages(),
             manager.napari_data(),
+            manager.napari_messages(),
             manager.napari_shutdown(),
-            manager.client_messages(),
             manager.client_data(),
+            manager.client_messages(),
         )
 
 
@@ -117,10 +117,6 @@ class NapariClient(Thread):
         self.config = config
         self._on_shutdown = on_shutdown
         self._running = False
-
-        # Data plucked out of self._remote.data, we might get rid of this
-        # and use the data from the shared dict directly?
-        self.napari_data = {}
 
         LOGGER.info("Starting process %s", os.getpid())
         _log_env()  # Log our startup environment.
@@ -190,63 +186,58 @@ class NapariClient(Thread):
         bool
             Return True if we should keep polling.
         """
-        if self._remote.napari_shutting_down.is_set():
+        if self._remote.napari_shutdown.is_set():
             LOGGER.info("Napari signaled shutdown.")
             return False  # Stop polling.
 
-        # Do we need to copy here? Otherwise are we referring directly to
-        # the version in shared memory? That might might be good: no copy
-        # unless we really reference the data? But could it change out from
-        # under us? Do we care as long as it's done safely, and we get the
-        # latest version? TBD.
-        self.napari_data['tile_data'] = {
-            "tile_config": self._remote.data.get('tile_config'),
-            "tile_state": self._remote.data.get('tile_state'),
-        }
+        return True  # Keep polling.
 
-        if LOG_DATA_FROM_NAPARI:
-            pretty_str = NumpyJSON.dumps(self.napari_data, indent=4)
-            LOGGER.info("New data from napari: %s", pretty_str)
+    def get_napari_data(self, key):
+        """Get data from napari."""
+        return self._remote.napari_data.get(key)
 
-        return True  # Keep polling
+    def send_message(self, message: dict) -> None:
+        """Send new message to napari.
 
-    def send_command(self, command) -> None:
-        """Send new command to napari.
+        Parameters
+        ----------
+        message : dict
+            The message/command to send to napari.
         """
-        LOGGER.info("Sending command %s", command)
+        LOGGER.info("Sending message %s", message)
 
         try:
-            # Put on the shared command queue.
-            self._remote.commands.put(command)
+            # Put message into the queue.
+            self._remote.client_messages.put(message)
         except ConnectionRefusedError:
-            LOGGER.error("ConnectionRefusedError sending command to napari.")
+            LOGGER.error("ConnectionRefusedError sending message to napari.")
 
-    def get_napari_message(self) -> dict:
-        """Get one message from napari.
+    def get_one_napari_message(self) -> Optional[dict]:
+        """Get one message from napari, non-blocking.
 
         Return
         ------
-        dict
-            The message.
+        Optional[dict]
+            The message or None if no message.
         """
         if not self._running:
-            return None  # Cannot get message from napari.
+            return None  # Can't get message from napari.
+
+        napari_messages = self._remote.napari_messages
 
         try:
-            while True:
-                try:
-                    message = self._remote.client_messages.get_nowait()
-                except ConnectionResetError:
-                    LOGGER.error(
-                        "ConnectionResetError getting messages from napari"
-                    )
-                    return None
+            message = napari_messages.get_nowait()
+            assert isinstance(message, dict)  # For now.
+            LOGGER.info("Message from napari: %s", json.dumps(message))
+            return message
+        except ConnectionResetError:
+            LOGGER.error("ConnectionResetError getting messages from napari")
+            # Napari is probably gone, but we let NapariClient._poll()
+            # notice this and exit. We just say there as no message.
+            return None
 
-                assert isinstance(message, dict)  # For now.
-                LOGGER.info("Message from napari: %s", json.dumps(message))
-                return message
         except Empty:
-            return None  # No more messages.
+            return None  # No message in the queue.
 
     @classmethod
     def create(cls, on_shutdown: Callable[[], None]):
