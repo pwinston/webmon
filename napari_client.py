@@ -218,18 +218,18 @@ class NapariClient(Thread):
         Return
         ------
         Optional[dict]
-            The message or None if no message.
+            The message or None if no message was available.
         """
         if not self._running:
-            return None  # Can't get message from napari.
+            return None  # Can't get messages from napari.
 
         napari_messages = self._remote.napari_messages
 
         try:
             message = napari_messages.get_nowait()
             assert isinstance(message, dict)  # For now.
-            LOGGER.info("Message from napari: %s", json.dumps(message))
             return message
+
         except ConnectionResetError:
             LOGGER.error("ConnectionResetError getting messages from napari")
             # Napari is probably gone, but we let NapariClient._poll()
