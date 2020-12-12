@@ -81,42 +81,33 @@ class NapariBridge:
                 continue  # Can't do much without a client.
 
             self._process_messages_from_napari()
-
-            # Send the tile data from napari to the WebUI.
-            self._emit_tile_data()
-
-            # Send queued commands to napari.
+            self._process_poll_data()
             self._send_commands_to_napari()
 
-    def _emit_tile_data(self) -> None:
-        """Emit the tile data to the web client."""
-        try:
-            tile_data = self._get_tile_data()
-        except KeyError:
-            LOGGER.error("KeyError with")
-            return  # No data or format was not as expected.
+    def _process_poll_data(self) -> None:
+        poll_data = self._client.get_napari_data("poll")
+        if poll_data is None:
+            return  # No poll data
+
+        # Extract the tile data.
+        tile_data = self._get_tile_data(poll_data)
 
         # Send it to the viewer.
-        LOGGER.info("emit: set_tile_data %d", self._frame_number)
         self._socketio.emit('set_tile_data', tile_data, namespace='/test')
 
-    def _get_tile_data(self) -> Optional[dict]:
-        """Return the latest tile data from napari.
+    def _get_tile_data(self, poll_data) -> Optional[dict]:
+        """Return the latest tile data from the poll_data
 
         Return
         ------
         Optional[dict]
-            The data for napari or None if there was none.
+            The tile data data or None if there was none.
         """
-        poll_data = self._client.get_napari_data("poll")
-        if poll_data is None:
-            return None
-
         layers = poll_data['layers']
         for _key, layer_data in layers.items():
             # Right now we just return the first octree layer's data. Once
             # the viewer can deal with it, we can send all the layers, and
-            # it can offer some type of menu to choose with layer to
+            # it can offer some type of menu to choose which layer to
             # display tiles for.
             return layer_data
 
@@ -136,19 +127,11 @@ class NapariBridge:
                 self._client.send_message(command)
 
     def _process_messages_from_napari(self) -> None:
-        """Process messages from napari."""
+        """Send napari messages to the web client"""
         while True:
             message = self._client.get_one_napari_message()
 
             if message is None:
                 return  # No more messages.
 
-            try:
-                # Send the message to the web client.
-                data = message['load']
-                LOGGER.info("send_load_data: %s", json.dumps(data))
-                self._socketio.emit('send_load_data', data, namespace='/test')
-            except KeyError:
-                LOGGER.info(
-                    "Ignoring unknown message: %s", json.dumps(message)
-                )
+            self._socketio.emit('napari_message', message, namespace='/test')
