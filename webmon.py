@@ -16,12 +16,11 @@ https://github.com/ageller/FlaskTest
 import logging
 import os
 import sys
-from pathlib import Path
 from typing import Optional
 
 import click
 import requests
-from flask import Flask, render_template, abort
+from flask import Flask, abort, render_template
 from flask_socketio import SocketIO
 
 from bridge import NapariBridge
@@ -73,12 +72,21 @@ pages = [
     "blank",
 ]
 
+
 @app.route('/<page_name>')
 def show_page(page_name):
     if page_name in pages:
-        routes = [dict(href=f"/{page}", name=page.capitalize(), active=page==page_name) for page in pages]
+        routes = [
+            dict(
+                href=f"/{page}",
+                name=page.capitalize(),
+                active=page == page_name,
+            )
+            for page in pages
+        ]
         return render_template(f"{page_name}.html", routes=routes)
     abort(404)
+
 
 @app.route("/stop")
 def stop():

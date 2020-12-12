@@ -19,6 +19,8 @@ const SHOW_AXES = true;  // Draw the axes (red=X green=Y).
 const SHOW_TILES = true;  // Draw the tiles themselves.
 const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
+var frame = 0;
+
 // We can't (?) use a [row, col] pair as the key. Because of how Javascript
 // compares lists. So we create a comma-separate string for each pair of
 // coordinates, like "4,23". Kind of silly, but it works fine.
@@ -42,7 +44,6 @@ class ViewerControls {
 	}
 
 	send() {
-		console.log('send()', this);
 		internalParams.socket.emit('send_command', this);
 	}
 }
@@ -104,21 +105,16 @@ function findCorners(seenTiles) {
 	return [min, max];
 }
 
-// 
+//
 // Find and store this.min and this.max corners of the seen tiles.
 //
-class TileCorners {
+// These are the corner of the seen tiles, not the view frustum corners.
+//
+class SeenTileCorners {
 	constructor(seenTiles) {
 		const corners = findCorners(seenTiles);
 		this.min = corners[0];
-		this.max = corners[1]
-	}
-
-	equal(other) {
-		return this.min[0] == other.min[0] &&
-			this.min[1] == other.min[1] &&
-			this.max[0] == other.max[0] &&
-			this.max[1] == other.max[1];
+		this.max = corners[1];
 	}
 }
 
@@ -133,7 +129,7 @@ class TileState {
 		var seenMap = new Map();
 
 		// Find the min/max coners of the seen tiles.
-		this.seenCorners = new TileCorners(this.message.seen);
+		this.seenCorners = new SeenTileCorners(this.message.seen);
 
 		// Populate the seen map.
 		this.message.seen.forEach(function (coord) {
@@ -142,7 +138,6 @@ class TileState {
 		});
 
 		this.seenMap = seenMap;
-		// console.log("seenMap = ", seenMap.size);
 	};
 
 	// Return true if this tile was seen.
@@ -173,7 +168,7 @@ class TileState {
 	}
 
 	equal(other) {
-		return this.seenCorners.equal(other.seenCorners);
+		return this.message.corners == other.message.corners;
 	}
 }
 
@@ -196,7 +191,7 @@ class Grid {
 		return this.tiles.has(gridKey(row, col));
 	}
 
-	// 
+	//
 	// Set the color of this tile.
 	// Create the tile if it doesn't already exist.
 	//
@@ -206,7 +201,6 @@ class Grid {
 			return;
 		}
 
-		console.log("createOneTile row, col = ", row, col);
 		createOneTile(row, col, color);
 	}
 
@@ -333,7 +327,7 @@ function addToScene(object) {
 }
 
 //
-// Draw a single thin line. 
+// Draw a single thin line.
 //
 // All lines are one pixel wide. There is a line width option but docs say
 // it does nothing in most renderers. And it seemed to do nothing for us.
@@ -365,7 +359,7 @@ function createAxes() {
 }
 
 //
-// Create a 1x1 rectangle with center at (0, 0) so we can 
+// Create a 1x1 rectangle with center at (0, 0) so we can
 // scale/move it into position.
 //
 function createRect(rectColor, onTop = false) {
@@ -393,7 +387,7 @@ function createRect(rectColor, onTop = false) {
 }
 
 //
-// Create and return one tile, a rectangular mesh. 
+// Create and return one tile, a rectangular mesh.
 //
 function createTileMesh(pos, size, initialColor) {
 
@@ -423,7 +417,7 @@ function createTileMesh(pos, size, initialColor) {
 ///
 function createOneTile(row, col, initialColor) {
 
-	// Use longer dimension so it fits in our [0..1] space. 
+	// Use longer dimension so it fits in our [0..1] space.
 	const maxLevelDim = tileConfig.maxLevelDim;
 
 	const levelRows = tileConfig.levelShape[0];
@@ -538,13 +532,13 @@ function addLights() {
 	});
 }
 
-// 
+//
 // Create the viewer on startup.
 //
 function createViewer() {
 
 	// Position/scale the group so the axes are like napari. A scale of -1
-	// on Y inverts that axis so +Y goes down the screen. 
+	// on Y inverts that axis so +Y goes down the screen.
 	//
 	// *---> X
 	// |
@@ -565,7 +559,7 @@ function createViewer() {
 }
 
 //
-// Animation loop. Not using this yet? But could be useful, so just 
+// Animation loop. Not using this yet? But could be useful, so just
 // leaving it here as a reference.
 //
 function animateViewer(time) {
