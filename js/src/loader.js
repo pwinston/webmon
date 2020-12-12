@@ -1,10 +1,11 @@
 //
 // loader.js
 //
-// Vega-Lite graphs about the ChunkLoader.
+// Vega-Lite graphs about the ChunkLoader and other things.
 //
 import vegaEmbed from 'vega-embed';
 import io from 'socket.io-client';
+import * as vega from "vega"
 
 const namespace = '/test';
 const url = location.protocol + '//' + document.domain + ':' + location.port + namespace;
@@ -13,14 +14,6 @@ const params = {
     namespace,
     socket: io.connect(url),
 };
-
-// Avoid these globals?
-var load_bytes_view = null;
-var load_ms_view = null;
-
-// Avoid these globals?
-var load_bytes_data = []
-var load_ms_data = []
 
 params.socket.on('connect', () => {
     console.log('connect');
@@ -36,40 +29,48 @@ params.socket.on('input_data_response', (msg) => {
     console.log("input_data_response", msg);
 });
 
+const window_size_seconds = 10;
+const time_gap_seconds = 0.25;
 
 class VegaChart {
     constructor(view) {
-        this.data = [];
         this.view = view;
+        this.start_time = null;
     }
 
-    push(entry) {
-        this.data.push(entry);
-        this.view.insert('table', this.data).run();
+    push(time, value) {
+        if (this.start_time === null) {
+            this.start_time = time;
+        }
+        const relative_time = time - this.start_time;
+        const mod_time = relative_time % window_size_seconds;
+        const oldest_time = relative_time - window_size_seconds + time_gap_seconds;
+        const entry = { time: relative_time, x: mod_time, y: value };
+
+        this.view.change('table',
+            vega.changeset().insert(entry)
+                .remove(entry => entry.time < oldest_time)).run();
     }
 
     static async from_spec(id, spec) {
         const res = await vegaEmbed(id, spec, { defaultStyle: true });
-        return new VegaChart(res.view);
+        return new VegaChart(res.view, res.vega);
     }
 }
 
 const bytes = {
     spec: 'static/specs/load_bytes.json',
-    id: '#load_bytes',
-    get_entry: (prev, msg) => ({ x: prev.length, y: msg.num_bytes }),
+    id: '#load_bytes'
 };
 
 const load_ms = {
     spec: 'static/specs/load_ms.json',
-    id: '#load_ms',
-    get_entry: (prev, msg) => ({ x: prev.length, y: msg.load_ms }),
+    id: '#load_ms'
 };
 
 const frame_time = {
     spec: 'static/specs/frame_time.json',
-    id: "#frame_time",
-    get_entry: (prev, msg) => ({ x: prev.length, y: msg }),
+    id: "#frame_time"
 };
 
 
@@ -80,14 +81,12 @@ export async function startLoader() {
 
     params.socket.on('napari_message', (msg) => {
         if ('load' in msg) {
-            const bytes_entry = bytes.get_entry(bytes_chart.data, msg.load);
-            bytes_chart.push(bytes_entry);
-
-            const load_ms_entry = load_ms.get_entry(load_ms_chart.data, msg.load);
-            load_ms_chart.push(load_ms_entry);
-        } else if ('frame_time_ms' in msg) {
-            const entry = frame_time.get_entry(frame_time_chart.data, msg.frame_time_ms);
-            frame_time_chart.push(entry);
+            const time = msg.load.time;
+            bytes_chart.push(time, msg.load.num_bytes);
+            load_ms_chart.push(time, msg.load.load_ms);
+        } else if ('frame_time' in msg) {
+            const time = msg.frame_time.time
+            frame_time_chart.push(time, msg.frame_time.delta_ms);
         }
     });
 }
