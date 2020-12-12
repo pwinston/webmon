@@ -6,6 +6,14 @@
 import vegaEmbed from 'vega-embed';
 import io from 'socket.io-client';
 
+const namespace = '/test';
+const url = location.protocol + '//' + document.domain + ':' + location.port + namespace;
+
+const params = {
+    namespace,
+    socket: io.connect(url),
+};
+
 // Avoid these globals?
 var load_bytes_view = null;
 var load_ms_view = null;
@@ -14,68 +22,62 @@ var load_ms_view = null;
 var load_bytes_data = []
 var load_ms_data = []
 
-var params = null;
-function defineParams() {
-    params = new function () {
+params.socket.on('connect', () => {
+    console.log('connect');
+    params.socket.emit('connection_test', { data: 'loader.js' });
+    params.socket.emit('input_data_request', { data: 'requesting data' });
+});
 
-        this.namespace = '/test';
+params.socket.on('connection_response', (msg) => {
+    console.log("connection_response:", msg);
+});
 
-        const url = location.protocol + '//' + document.domain + ':' +
-            location.port + this.namespace
-        this.socket = io.connect(url);
-    };
+params.socket.on('input_data_response', (msg) => {
+    console.log("input_data_response", msg);
+});
+
+
+class VegaChart {
+    constructor(view) {
+        this.data = [];
+        this.view = view;
+    }
+
+    push(entry) {
+        this.data.push(entry);
+        this.view.insert('table', this.data).run();
+    }
+
+    static async from_spec(id, spec) {
+        const res = await vegaEmbed(id, spec, { defaultStyle: true });
+        return new VegaChart(res.view);
+    }
 }
 
-export function connectSocketInput() {
-    console.log("connectSocketInput")
+const bytes = {
+    spec: 'static/specs/load_bytes.json',
+    id: '#load_bytes',
+    get_entry: (prev, msg) => ({ x: prev.length, y: msg.num_bytes }),
+};
 
-    document.addEventListener("DOMContentLoaded", function (event) {
+const load_ms = {
+    spec: 'static/specs/load_ms.json',
+    id: '#load_ms',
+    get_entry: (prev, msg) => ({ x: prev.length, y: msg.load_ms }),
+};
 
-        // Connect invoked when a connection with the server setup.
-        params.socket.on('connect', function () {
-            console.log("connect")
-            params.socket.emit('connection_test', { data: 'loader.js' });
-            params.socket.emit('input_data_request', { data: 'requesting data' });
-        });
 
-        params.socket.on('connection_response', function (msg) {
-            console.log("connection_response:", msg);
-        });
+export async function startLoader() {
+    const bytes_chart = await VegaChart.from_spec(bytes.id, bytes.spec);
+    const load_ms_chart = await VegaChart.from_spec(load_ms.id, load_ms.spec);
 
-        params.socket.on('input_data_response', function (msg) {
-            console.log("input_data_response", msg);
-        });
+    params.socket.on('send_load_data', (msg) => {
+        console.log("insert data", msg)
 
-        params.socket.on('send_load_data', function (msg) {
-            console.log("insert data", msg)
+        const bytes_entry = bytes.get_entry(bytes_chart.data, msg);
+        bytes_chart.push(bytes_entry);
 
-            load_bytes_data.push({ "x": load_bytes_data.length, "y": msg.num_bytes })
-            load_bytes_view.insert("table", load_bytes_data).run();
-
-            load_ms_data.push({ "x": load_ms_data.length, "y": msg.load_ms })
-            load_ms_view.insert("table", load_ms_data).run();
-        });
+        const load_ms_entry = load_ms.get_entry(load_ms_chart.data, msg);
+        load_ms_chart.push(load_ms_entry);
     });
-}
-
-
-function showCharts() {
-    const load_bytes_spec = "static/specs/load_bytes.json";
-    vegaEmbed('#load_bytes', load_bytes_spec, { defaultStyle: true })
-        .then(function (result) {
-            load_bytes_view = result.view;
-        });
-
-    const load_ms_spec = "static/specs/load_ms.json";
-    vegaEmbed('#load_ms', load_ms_spec, { defaultStyle: true })
-        .then(function (result) {
-            load_ms_view = result.view;
-        });
-}
-
-export function startLoader() {
-    console.log("startLoader");
-    defineParams();
-    showCharts();
-    connectSocketInput();
 }
