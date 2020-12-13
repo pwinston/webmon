@@ -49,9 +49,9 @@ bog down. Limit is TBD.
 
 # socket io version
 
-Something we are using is not compatible with least socketio stuff. So we need to stay in this red box. Our npm and Python requirements.txt should put us there. But worth knowing. If you get this error `The client is using an unsupported version of the Socket.IO or Engine.IO protocols` the WebUI will not talk to webmon until you fix the dependencies.
+Something we are using is not compatible with latest socketio version. So we need to stay in this red box. Our npm and Python requirements.txt should configure this for you. However, if you get this error `The client is using an unsupported version of the Socket.IO or Engine.IO protocols` the WebUI will not talk to webmon until you fix the dependencies.
 
-![socketio](https://user-images.githubusercontent.com/4163446/102025993-7ba1e500-3d69-11eb-812c-2a50796ea9bc.png)
+![socketio](https://user-images.githubusercontent.com/4163446/102025993-7ba1e500-3d69-11eb-812c-2a50796ea9bc.png | width=600)
 
 # Making Changes
 
