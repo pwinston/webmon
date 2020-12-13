@@ -29,27 +29,32 @@ params.socket.on('input_data_response', (msg) => {
     console.log("input_data_response", msg);
 });
 
-const window_size_seconds = 10;
-const time_gap_seconds = 0.25;
+const window_seconds = 10;
+const gap_seconds = 0.25;
 
 class VegaChart {
     constructor(view) {
         this.view = view;
-        this.start_time = null;
     }
 
-    push(time, value) {
-        if (this.start_time === null) {
-            this.start_time = time;
+    push(entries) {
+        if (!entries)
+            return  // Nothing to add.
+
+        var chart_entries = [];
+        for (var entry of entries) {
+            const mod_time = entry.time % window_seconds;
+            chart_entries.push({ time: entry.time, x: mod_time, y: entry.value });
         }
-        const relative_time = time - this.start_time;
-        const mod_time = relative_time % window_size_seconds;
-        const oldest_time = relative_time - window_size_seconds + time_gap_seconds;
-        const entry = { time: relative_time, x: mod_time, y: value };
+
+        console.log("chart_entries", chart_entries);
+
+        const last = chart_entries.length - 1;
+        const keep_time = chart_entries[last].time - window_seconds + gap_seconds;
 
         this.view.change('table',
-            vega.changeset().insert(entry)
-                .remove(entry => entry.time < oldest_time)).run();
+            vega.changeset().insert(chart_entries)
+                .remove(entry => entry.time < keep_time)).run();
     }
 
     static async from_spec(id, spec) {
@@ -73,20 +78,45 @@ const frame_time = {
     id: "#frame_time"
 };
 
+function updateCharts() {
+    params.socket.emit('get_chart_data', {});
+    console.log("updateCharts");
+}
 
 export async function startLoader() {
-    const bytes_chart = await VegaChart.from_spec(bytes.id, bytes.spec);
-    const load_ms_chart = await VegaChart.from_spec(load_ms.id, load_ms.spec);
     const frame_time_chart = await VegaChart.from_spec(frame_time.id, frame_time.spec);
+    const load_ms_chart = await VegaChart.from_spec(load_ms.id, load_ms.spec);
+    const bytes_chart = await VegaChart.from_spec(bytes.id, bytes.spec);
+    window.setInterval(updateCharts, 100);
 
-    params.socket.on('napari_message', (msg) => {
-        if ('load' in msg) {
-            const time = msg.load.time;
-            bytes_chart.push(time, msg.load.num_bytes);
-            load_ms_chart.push(time, msg.load.load_ms);
-        } else if ('frame_time' in msg) {
-            const time = msg.frame_time.time
-            frame_time_chart.push(time, msg.frame_time.delta_ms);
+    params.socket.on('chart_data', (msg) => {
+        console.log('chart_data', msg);
+        for (const key in msg) {
+            switch (key) {
+                case 'frame_time':
+                    var entries = [];
+                    for (const entry of msg.frame_time) {
+                        entries.push({ time: entry.time, value: entry.delta_ms });
+                    }
+                    console.log("entries", entries);
+                    frame_time_chart.push(entries);
+                    break;
+                case 'load_chunk':
+                    var load_entries = [];
+                    var byte_entries = [];
+                    for (const entry of msg.frame_time) {
+                        load_entries.push({ time: entry.time, value: entry.load_ms });
+                        byte_entries.push({ time: entry.time, value: entry.num_bytes });
+                    }
+                    load_ms_chart.push(load_entries);
+                    bytes_chart.push(byte_entries);
+                    break;
+            }
         }
-    });
+
+        params.socket.on('napari_message', (msg) => {
+            // Any messages from napari that's not chart data will come here,
+            // we don't expect anything yet.
+        });
+    })
 }

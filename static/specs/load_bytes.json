@@ -1,17 +1,17 @@
 {
     "$schema": "https://vega.github.io/schema/vega-lite/v4.json",
-    "height": 300,
+    "width": 800,
     "padding": 50,
     "data": {
         "name": "table"
     },
     "title": "Bytes Per Chunk",
-    "mark": "area",
+    "mark": "point",
     "encoding": {
         "x": {
             "field": "x",
             "type": "quantitative",
-            "title": "Frame  Number"
+            "title": "Time"
         },
         "y": {
             "field": "y",

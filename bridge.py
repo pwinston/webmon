@@ -3,8 +3,8 @@
 Communicates between the webmon.py (the Flask-SocketIO app) and the
 NapariClient (the napari shared memory client).
 """
-import json
 import logging
+import time
 from queue import Empty, Queue
 from threading import Thread, get_ident
 from typing import Optional
@@ -18,6 +18,45 @@ LOGGER = logging.getLogger("webmon")
 # Number of milliseconds between sending/receiving data.
 POLL_INTERVAL_MS = 16.7
 POLL_INTERVAL_SECONDS = POLL_INTERVAL_MS / 1000
+
+
+class ChartMessages:
+    def __init__(self):
+        self.keys = ['frame_time', 'load_chunk']
+        self._messages = {key: [] for key in self.keys}
+        self._last_time = None
+
+    def clear(self) -> None:
+        for values in self._messages.values():
+            values.clear()
+
+    def add_chart_message(self, message) -> bool:
+        """If this is a chart message add it and return True.
+
+        A chart mesage is like:
+
+        {
+            "frame_time": {
+                "delta_ms" 16.7
+            }
+        }
+
+        """
+        for key in self.keys:
+            if key in message:
+                one_message = message[key]
+                self._messages[key].append(one_message)
+                return True
+
+        return False  # Not a chart message.
+
+    @property
+    def messages(self):
+        return self._messages
+
+    def log_counts(self) -> None:
+        for key, values in self.messages.items():
+            LOGGER.info("Key %s: %d values", key, len(values))
 
 
 class NapariBridge:
@@ -41,6 +80,8 @@ class NapariBridge:
         self._client = client
         self._commands = Queue()
         self._frame_number = 0
+        self._chart_messages = ChartMessages()
+        self._last_emit = None
 
     def send_command(self, command: dict) -> None:
         """Set this command to napari.
@@ -134,4 +175,29 @@ class NapariBridge:
             if message is None:
                 return  # No more messages.
 
-            self._socketio.emit('napari_message', message, namespace='/test')
+            # Try adding it as a chart message. We store these up and only
+            # send them when the web client asks for them. Otherwise the
+            # web client would bog down with too many messages.
+            if not self._chart_messages.add_chart_message(message):
+                # Was not a chart message so just pass it to the web client.
+                self._socketio.emit(
+                    'napari_message', message, namespace='/test'
+                )
+
+    def emit_chart_data(self):
+        messages = self._chart_messages.messages
+
+        for key, values in messages.items():
+            LOGGER.info("Sending %s: %d values", key, len(values))
+
+        if self._last_emit is None:
+            self._last_emit = time.time()
+        else:
+            now = time.time()
+            elapsed = now - self._last_emit
+            LOGGER.info("last emit: %f", elapsed)
+            self._last_emit = now
+
+        self._socketio.emit('chart_data', messages, namespace='/test')
+        self._chart_messages.clear()
+
