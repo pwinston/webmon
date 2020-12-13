@@ -11,7 +11,13 @@
         "x": {
             "field": "x",
             "type": "quantitative",
-            "title": "Time"
+            "title": "Time",
+            "scale": {
+                "domain": [
+                    0,
+                    10
+                ]
+            }
         },
         "y": {
             "field": "y",
