@@ -136,6 +136,14 @@ Probably the same `__main__` problem as above. Napari ran a second time,
 which created `SharedMemoryMonitor` a second time, which forked a second
 time. A fork loop basically.
 
+# Dask Dashboard
+
+The Dask Dashboard design is very similar to webmon. It's also a localhost website that you connect to, which has tabs along the time, and graphs and other visualizations:
+
+![Dask Dashboard](https://user-images.githubusercontent.com/4163446/102133865-c41dd900-3e23-11eb-825e-ee50e0a94e89.png)
+
+They use [Bokeh](https://docs.bokeh.org/en/latest/index.html) where we use [Vega-Lite](https://vega.github.io/vega-lite/). It looks like Bokeh might be better for streaming data. There is a Python server you can get which talks to the Javscript front end.
+
 # Future Work
 
 Beyond messages, the Big Kahuna would be using shared memory buffers to
@@ -145,14 +153,6 @@ Websocket hop might be the slow part. This has not been attempted yet. If
 the websocket hop is the slow part, could an
 [Electron](https://www.electronjs.org/) process be a shared memory client,
 and then directly render the data? TBD.
-
-# Dask Dashboard
-
-The Dask Dashboard design is very similar to webmon. It's also a localhost website that you connect to, which has tabs along the time, and graphs and other visualizations:
-
-[Dask Dashboard](https://user-images.githubusercontent.com/4163446/102133865-c41dd900-3e23-11eb-825e-ee50e0a94e89.png)
-
-They use [Bokeh](https://docs.bokeh.org/en/latest/index.html) where we use [Vega-Lite](https://vega.github.io/vega-lite/). It looks like Bokeh might be better for streaming data. There is a Python server you can get which talks to the Javscript front end.
 
 # References
 
