@@ -169,11 +169,15 @@ class NapariBridge:
 
     def _process_messages_from_napari(self) -> None:
         """Send napari messages to the web client"""
+        num_messages = 0
+
         while True:
             message = self._client.get_one_napari_message()
 
             if message is None:
                 return  # No more messages.
+
+            num_messages += 1
 
             # Try adding it as a chart message. We store these up and only
             # send them when the web client asks for them. Otherwise the
@@ -183,6 +187,8 @@ class NapariBridge:
                 self._socketio.emit(
                     'napari_message', message, namespace='/test'
                 )
+
+        LOGGER.info("Received %d messages from napari.", num_messages)
 
     def emit_chart_data(self):
         messages = self._chart_messages.messages
