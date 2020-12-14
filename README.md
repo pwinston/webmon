@@ -146,6 +146,14 @@ the websocket hop is the slow part, could an
 [Electron](https://www.electronjs.org/) process be a shared memory client,
 and then directly render the data? TBD.
 
+# Dask Dashboard
+
+The Dask Dashboard design is very similar to webmon. It's also a localhost website that you connect to, which has tabs along the time, and graphs and other visualizations:
+
+[Dask Dashboard](https://user-images.githubusercontent.com/4163446/102133865-c41dd900-3e23-11eb-825e-ee50e0a94e89.png)
+
+They use [Bokeh](https://docs.bokeh.org/en/latest/index.html) where we use [Vega-Lite](https://vega.github.io/vega-lite/). It looks like Bokeh might be better for streaming data. There is a Python server you can get which talks to the Javscript front end.
+
 # References
 
 Please add more references if you found them useful.
