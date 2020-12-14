@@ -138,7 +138,7 @@ time. A fork loop basically.
 
 # Dask Dashboard
 
-The Dask Dashboard design is very similar to webmon. It's also a localhost website that you connect to, which has tabs along the time, and graphs and other visualizations. Here is Dask Dashboard on the left from [this video](https://youtu.be/N_GqzcuGLCY) and webmon on the right:
+The Dask Dashboard design is very similar to webmon. It's also a localhost website that you connect to, which has tabs along the top, and the tabs show graphs and other visualizations. Theirs is much more advanced. Here is Dask Dashboard on the left from [this video](https://youtu.be/N_GqzcuGLCY) and webmon on the right:
 
 ![Dask Dashboard](https://user-images.githubusercontent.com/4163446/102133865-c41dd900-3e23-11eb-825e-ee50e0a94e89.png)
 
