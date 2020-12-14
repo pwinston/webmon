@@ -38,9 +38,6 @@ class VegaChart {
     }
 
     push(entries) {
-        if (!entries)
-            return  // Nothing to add.
-
         var chart_entries = [];
         for (var entry of entries) {
             const mod_time = entry.time % window_seconds;
@@ -104,10 +101,11 @@ export async function startLoader() {
                 case 'load_chunk':
                     var load_entries = [];
                     var byte_entries = [];
-                    for (const entry of msg.frame_time) {
+                    for (const entry of msg.load_chunk) {
                         load_entries.push({ time: entry.time, value: entry.load_ms });
                         byte_entries.push({ time: entry.time, value: entry.num_bytes });
                     }
+                    console.log("load_entries", load_entries);
                     load_ms_chart.push(load_entries);
                     bytes_chart.push(byte_entries);
                     break;
