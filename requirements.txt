@@ -3,3 +3,5 @@ eventlet==0.29.1
 Flask==1.1.2
 Flask-SocketIO==4.3.1
 numpy==1.19.4
+python-socketio==4.6.0
+python-engineio==3.14.2

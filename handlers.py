@@ -37,7 +37,7 @@ class WebmonHandlers(Namespace):
 
     def __init__(self, bridge: NapariBridge, namespace: str):
         super().__init__(namespace)
-        self.bridge = bridge
+        self._bridge = bridge
         self.lock = Lock()
         self.thread = None
 
@@ -59,7 +59,7 @@ class WebmonHandlers(Namespace):
     def on_send_command(self, message):
         """Web app emits this to send a command."""
         LOGGER.info("on_send_command: %s", json.dumps(message))
-        self.bridge.send_command(message)
+        self._bridge.send_command(message)
 
     def on_connect(self):
         """Create a background thread on connection.."""
@@ -70,4 +70,8 @@ class WebmonHandlers(Namespace):
         with self.lock:
             if self.thread is None:
                 LOGGER.info("Webmon: Creating background task...")
-                self.thread = self.bridge.start_background_task()
+                self.thread = self._bridge.start_background_task()
+
+    def on_get_chart_data(self, _message):
+        LOGGER.info("on_get_chart_data")
+        self._bridge.emit_chart_data()

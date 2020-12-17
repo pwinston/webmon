@@ -295,7 +295,7 @@ export function connectSocketInput() {
 		// Connect invoked when a connection with the server setup.
 		internalParams.socket.on('connect', function () {
 			console.log("connect")
-			internalParams.socket.emit('connection_test', { data: 'viewer.js' });
+			internalParams.socket.emit('connection_test', { data: 'viewer' });
 			internalParams.socket.emit('input_data_request', { data: 'requesting data' });
 		});
 
