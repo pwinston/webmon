@@ -11,15 +11,15 @@ See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for
 
 # Screenshots
 
-There are only two pages in the WebUI right now.
+The two pages in the WebUI right now:
 
 ## Tile Viewer
 
 ![tiles](https://user-images.githubusercontent.com/4163446/100827155-188b8680-342a-11eb-92bb-217321705947.png)
 
-## ChunkLoader Stats
+## Loader Stats
 
-![graphs](https://user-images.githubusercontent.com/4163446/100827017-b763b300-3429-11eb-94c0-77c5110dc275.png)
+![graphs](https://user-images.githubusercontent.com/4163446/106675049-5e77de80-6582-11eb-8a03-167ee46f5b88.png)
 
 # Summary
 
@@ -98,7 +98,7 @@ direction, but not there yet.
 
 ### NAPARI_MON is starting two copies of napari?
 
-If you are using your own script to launch napari, make sure you 
+If you are using your own script to launch napari, make sure you
 are using the convention:
 
 ```
