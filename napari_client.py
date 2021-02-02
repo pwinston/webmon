@@ -122,7 +122,7 @@ class NapariClient(Thread):
         _log_env()  # Log our startup environment.
 
         server_port = config['server_port']
-        LOGGER.info("connecting to napari on port %d.", server_port)
+        LOGGER.info("Connecting to napari on port %d.", server_port)
 
         # We have to register these before creating the SharedMemoryManager.
         # Note that we don't have to give the types, just the names.
