@@ -126,9 +126,17 @@ class NapariBridge:
             self._send_commands_to_napari()
 
     def _process_poll_data(self) -> None:
+        """Process the "poll" message from napari.
+
+        Napari sends a "poll" message once per frame. It's meant to contains
+        data that potentially changes every frame, like information related
+        to the current camera position which might be moving.
+        """
         poll_data = self._client.get_napari_data("poll")
         if poll_data is None:
             return  # No poll data
+
+        LOGGER.info("Received poll from napari.")
 
         # Extract the tile data.
         tile_data = self._get_tile_data(poll_data)
