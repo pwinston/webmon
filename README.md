@@ -17,9 +17,14 @@ Web app has two pages **Tile Viewer** and **Loader Stats**:
 
 ## Tile Viewer
 
+The Tile Viewer is shown on left. On right is napari. The tile viewer shows which Octree/Quadtree tiles are currently being viewed by napari. The yellow rectangle is the view frustum, and the red tiles are the ones napari is drawing.
+
+
 ![tiles](https://user-images.githubusercontent.com/4163446/100827155-188b8680-342a-11eb-92bb-217321705947.png)
 
 ## Loader Stats
+
+The Loader Stats are three 2D Vega-Lite graphs:
 
 ![graphs](https://user-images.githubusercontent.com/4163446/106675049-5e77de80-6582-11eb-8a03-167ee46f5b88.png)
 
