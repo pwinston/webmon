@@ -28,9 +28,9 @@ The Loader Stats are three 2D Vega-Lite graphs:
 
 ![graphs](https://user-images.githubusercontent.com/4163446/106675049-5e77de80-6582-11eb-8a03-167ee46f5b88.png)
 
-# Summary
+# Overview
 
-There is a shared memory connection between napari (Python) and this little
+There is a shared memory connection between napari (Python) and the small
 webmon process (Python). And there is an always-on
 [WebSocket](https://tools.ietf.org/html/rfc6455) connection between webmon
 (Python) and the web app (Javascript). Messages can flow through both hops
