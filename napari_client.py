@@ -193,7 +193,7 @@ class NapariClient(Thread):
         return True  # Keep polling.
 
     def get_napari_data(self, key):
-        """Get data from napari."""
+        """Get data from napari shared dict."""
         return self._remote.napari_data.get(key)
 
     def send_message(self, message: dict) -> None:

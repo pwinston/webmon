@@ -128,7 +128,7 @@ class NapariBridge:
     def _process_poll_data(self) -> None:
         """Process the "poll" message from napari.
 
-        Napari sends a "poll" message once per frame. It's meant to contains
+        Napari sends a "poll" message once per frame. It's meant to contain
         data that potentially changes every frame, like information related
         to the current camera position which might be moving.
         """
@@ -136,28 +136,42 @@ class NapariBridge:
         if poll_data is None:
             return  # No poll data
 
-        LOGGER.info("Received poll from napari.")
+        # Extract the layer data and send to viewer.
+        layer_data = self._get_layer_data(poll_data)
 
-        # Extract the tile data.
-        tile_data = self._get_tile_data(poll_data)
+        if layer_data:
+            LOGGER.info(
+                "set_layer_data corner = %f",
+                layer_data['tile_state']['corners'][0][0],
+            )
 
-        # Send it to the viewer.
-        self._socketio.emit('set_tile_data', tile_data, namespace='/test')
+            self._socketio.emit(
+                'set_layer_data', layer_data, namespace='/test'
+            )
 
-    def _get_tile_data(self, poll_data) -> Optional[dict]:
-        """Return the latest tile data from the poll_data
+    def _get_layer_data(self, poll_data) -> Optional[dict]:
+        """Return the latest layer data from the poll_data
+
+        {
+            "poll": {
+                "layers": {
+                    13482484: {
+                        "tile_state": ...
+                        "tile_config": ...
+                    }
+                }
+            }
+        }
 
         Return
         ------
         Optional[dict]
-            The tile data data or None if there was none.
+            The layer data data or None if there was none.
         """
         layers = poll_data['layers']
-        for _key, layer_data in layers.items():
-            # Right now we just return the first octree layer's data. Once
-            # the viewer can deal with it, we can send all the layers, and
-            # it can offer some type of menu to choose which layer to
-            # display tiles for.
+        for layer_data in layers.values():
+            # Right now we just return the first octree layer's data, someday
+            # maybe the viewer can display multiple layers.
             return layer_data
 
         return None  # No layers?

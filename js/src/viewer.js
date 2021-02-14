@@ -1,10 +1,18 @@
 //
 // viewer.js
 //
-// WebGL display of which octree tiles are visible in napari, as well as
-// the current view frustum. The tiles are drawn as a grid of gray
-// rectangles. The view is yellow rectangle. And the one or more tiles that
-// were "seen" by that view are drawn in red.
+// A three.js (WebGL) display of the octree tiles in napari. The tiles are
+// drawn as a grid of gray rectangles. The view frustum as a yellow
+// rectangle. The visible tiles "seen" by that view are drawn in red.
+//
+// The display of tiles is "sparse" to support huge levels. We only draw a
+// subset of tiles around the seen ones. Some levels in napari might have
+// tens of millions of tiles, it would be impossible to draw them all.
+//
+// TODO:
+//
+// 1) Get pan/zoom working, so we can zoom in and see the tiny tiles when
+//    on a huge level with millions of tiles.
 //
 import * as THREE from 'three';
 import { GridHelper } from 'three';
@@ -21,21 +29,18 @@ const SHOW_VIEW = true;  // Draw the yellow view frustum.
 
 var frame = 0;
 
-// We can't (?) use a [row, col] pair as the key. Because of how Javascript
-// compares lists. So we create a comma-separate string for each pair of
-// coordinates, like "4,23". Kind of silly, but it works fine.
+// We can't use a [row, col] pair as the key, because of how Javascript
+// compares lists. So use a comma-separated string like "4,23".
 function gridKey(row, col) {
 	return [row, col].join(",");
 }
 
 // Draw a border of CONTEXT_BORDER tiles around the seen tiles.
 //
-// The number of tiles on each level goes up quickly: 1, 4, 9, 16, 25, etc.
-//
 // On a big dataset the largest levels might have tens of millions of
-// tiles! For performance reasons we can't draw them all. And even if we
-// could they'd be too small to see. So we only draw the scene tiles
-// and context border around them.
+// tiles! So we can't draw them all. And even if we could they'd be too
+// small to see. So we only draw the seen tiles with some "context" around
+// them.
 const CONTEXT_BORDER = 5;
 
 class ViewerControls {
@@ -49,6 +54,13 @@ class ViewerControls {
 }
 
 var viewerControls = new ViewerControls();
+
+// The set_layer_data message sets this, and then
+var layerData = null;
+
+// Our own state objects we pull out of the layerData in drawViewer().
+var tileState = null;
+var tileConfig = null;
 
 //
 // The (rows x cols) in the current level and related information.
@@ -123,6 +135,11 @@ class SeenTileCorners {
 //
 class TileState {
 	constructor(message) {
+		// message =
+		// {
+		//	  "seen": # A list of (row, col) pairs of visible tiles.
+		//	  "corners": # View in data coordinates ((x0, y0), (x1, y1)).
+		// }
 		this.message = message;  // The message from napari.
 
 		// seenMap so we can quickly set the colors of the tiles.
@@ -165,10 +182,6 @@ class TileState {
 			Math.min(rows, max[0] + CONTEXT_BORDER),
 			Math.min(cols, max[1] + CONTEXT_BORDER)
 		];
-	}
-
-	equal(other) {
-		return this.message.corners == other.message.corners;
 	}
 }
 
@@ -226,7 +239,19 @@ class Grid {
 	}
 
 	// Update to reflect the most recent messages from the server.
-	update() {
+	update(newState, newConfig) {
+
+		const oldLevel = tileConfig ? tileConfig.levelIndex : null;
+
+		// These should not be globals but are right now.
+		tileState = newState;
+		tileConfig = newConfig;
+
+		if (tileConfig.levelIndex != oldLevel) {
+			// New level so start completely over with tiles.
+			this.removeAll();
+		}
+
 		if (SHOW_TILES) {
 			updateSeen();
 		}
@@ -239,55 +264,6 @@ class Grid {
 
 var grid = new Grid();
 
-// Create with defaults in case we draw before getting any data.
-var tileConfig = new TileConfig({
-	base_shape: [256, 256],
-	image_shape: [256, 256],
-	shape_in_tiles: [1, 1],
-	tile_size: 256,
-	level_index: null  // so we update it with the real tileConfig
-});
-
-// Create with defaults in case we draw before getting any data.
-var tileState = new TileState({
-	seen: [],
-	corners: [[0, 0], [1, 1]]
-});
-
-
-//
-// Server sent us some data.
-//
-function setTileData(msg) {
-	const newState = new TileState(msg.tile_state);
-
-	if (tileState && newState.equal(tileState)) {
-		// Same state. Don't waste time and console spam.
-		return;
-	}
-
-	tileState = new TileState(msg.tile_state);
-
-	// Only create tiles if level changed. Because toggling colors is cheaper
-	// then creating new tiles, so only create tiles if needed.
-	if (!tileConfig || tileConfig.levelIndex != msg.tile_config['level_index']) {
-		tileConfig = new TileConfig(msg.tile_config);
-
-		if (SHOW_TILES) {
-			grid.removeAll();
-		}
-	}
-
-	if (SHOW_TILES) {
-		grid.update();
-	}
-}
-
-// References:
-//
-// https://blog.miguelgrinberg.com/post/easy-websockets-with-flask-and-gevent
-// https://github.com/miguelgrinberg/Flask-SocketIO
-//
 export function connectSocketInput() {
 
 	document.addEventListener("DOMContentLoaded", function (event) {
@@ -307,8 +283,9 @@ export function connectSocketInput() {
 			console.log("input_data_response", msg);
 		});
 
-		internalParams.socket.on('set_tile_data', function (msg) {
-			setTileData(msg);
+		internalParams.socket.on('set_layer_data', function (msg) {
+			layerData = msg;
+			console.log("set_layer_data", layerData.tile_state.corners[0][0]);
 		});
 	});
 }
@@ -450,7 +427,7 @@ function createOneTile(row, col, initialColor) {
 // maybe it's a bit faster than create a new rect every frame?
 //
 function moveView() {
-	const normPos = [0, 0]; //tileConfig.normPos(tileState.cornerTile);
+	const normPos = [0, 0];
 
 	// Get the maxDim in base image pixels (data coordinates).
 	const baseX = tileConfig.baseShape[1];
@@ -490,27 +467,19 @@ function moveViewRect(pos, size) {
 // Update the color of all tiles. Red if seen, otherwise gray.
 //
 function updateSeen() {
-	// Experimental: move the entire grid to the corner location.
-	// const normPos = tileConfig.normPos(tileState.cornerTile)
-	// internalParams.tileParent.position.x = -normPos[1];
-	//internalParams.tileParent.position.y = -normPos[0];
-
 	// We create/update tiles in the whole context window.
 	const start = tileState.getContextMin();
 	const end = tileState.getContextMax();
 
-	// Mark every tile as not seen first. These might be far outside the
-	// context window, if we've been panning around. Eventually might
-	// want to "garbage collect" tiles which are far in the past.
+	// Mark every tile as not seen first.
 	grid.clearSeen();
 
 	// Iterate through every tile in the context window, creating tiles as
 	// needed. Mark existing and new tiles with the right color.
 	for (let row = start[0]; row < end[0]; row++) {
 		for (let col = start[1]; col < end[1]; col++) {
-			// For every tile in the context window, set it as seen or not
-			// seen. This will create tiles if they don't exist yet. So
-			// there is like this trail of created tiles as we pan around.
+			// This will create tiles if they don't exist yet. So if
+			// we pan around there will be a trail of tiles.
 			const seen = tileState.wasSeen(row, col);
 			const color = seen ? COLOR_TILE_SEEN : COLOR_TILE_OFF;
 			grid.setTileColor(row, col, color)
@@ -559,11 +528,19 @@ function createViewer() {
 }
 
 //
-// Animation loop. Not using this yet? But could be useful, so just
-// leaving it here as a reference.
+// Animate and draw the entire scene.
 //
-function animateViewer(time) {
-	requestAnimationFrame(animateViewer);
+function drawViewer(time) {
+	// This will cause drawViewer() to be draw at around 60Hz.
+	requestAnimationFrame(drawViewer);
+
+	if (layerData) {
+		console.log("update");
+		const newState = new TileState(layerData.tile_state);
+		const newConfig = new TileConfig(layerData.tile_config);
+		grid.update(newState, newConfig);
+	}
+
 	internalParams.controls.update();
 	internalParams.renderer.render(internalParams.scene, internalParams.camera);
 }
@@ -596,7 +573,7 @@ export function startViewer() {
 	setupControls();
 
 	createViewer();
-	animateViewer();
+	drawViewer();
 
 	connectSocketInput();
 }
