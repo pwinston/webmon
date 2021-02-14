@@ -12,7 +12,11 @@ LOGGER = logging.getLogger("webmon")
 # cons to deleting it depending on how you are monitoring it.
 DELETE_LOG_FILE = False
 
-FORMAT = "%(levelname)s - %(name)s - %(message)s"
+# Use %(asctime) and %(msecs) to get this format:
+#   11:31:59.593
+# Leave off the date which is a waste of space.
+FORMAT = "%(asctime)s.%(msecs)03d %(levelname)s - %(name)s - %(message)s"
+DATE_FORMAT = "%H:%M:%S"
 
 
 def _log_to_file(path: str) -> None:
@@ -31,7 +35,7 @@ def _log_to_file(path: str) -> None:
 
     fh = logging.FileHandler(path)
 
-    formatter = logging.Formatter(FORMAT)
+    formatter = logging.Formatter(FORMAT, DATE_FORMAT)
     fh.setFormatter(formatter)
     LOGGER.addHandler(fh)
 
