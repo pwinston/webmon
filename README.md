@@ -13,7 +13,7 @@ See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for
 
 # Screenshots
 
-The two pages in the WebUI right now:
+Web app has two pages **Tile Viewer** and **Loader Stats**:
 
 ## Tile Viewer
 
