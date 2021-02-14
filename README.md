@@ -1,5 +1,7 @@
 # webmon
 
+Written in November and December 2020 for the Octree/Async work in napari.
+
 Webmon is three things:
 1. An experimental [napari](https://napari.org/) shared memory client.
 2. A proof of concept [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
