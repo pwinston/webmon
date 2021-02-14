@@ -7,7 +7,7 @@ Webmon is three things:
 2. A proof of concept [Flask-SocketIO](https://flask-socketio.readthedocs.io/en/latest/) webserver.
 3. An example web app that contains two pages:
     * `/viewer` a [three.js](https://threejs.org/) (WebGL) display of what tiles are visible in napari.
-    * `/loader` with two very simple [Vega-Lite](https://vega.github.xo/vega-lite/) graphs related to the `ChunkLoader`.
+    * `/loader` with three [Vega-Lite](https://vega.github.xo/vega-lite/) graphs related to the `ChunkLoader`.
 
 See the lengthy napari [PR 1909](https://github.com/napari/napari/pull/1909) for more information.
 
