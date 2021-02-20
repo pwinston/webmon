@@ -107,6 +107,28 @@ direction, but not there yet.
    * Create a system so we only share data if a client is asking for it.
 * Modify **napari** so the WebUI can control more things.
 
+# How To Add A Page
+
+1. In `webmon.py` add an entry to the `pages` list like:
+
+    pages = [
+        "viewer",
+        "loader",
+        "my_new_page"
+    ]
+    
+2. In `build.js` add your `.js` file for the page:
+
+	entryPoints: [
+		'src/viewer.js',
+		'src/loader.js',
+		'src/my_new_page.js'
+	],
+
+3. Add your new `js/src/my_new_page.js` and `templates/my_new_page.html`.
+
+
+
 # FAQ
 
 ### NAPARI_MON is starting two copies of napari?
