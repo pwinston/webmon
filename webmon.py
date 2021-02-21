@@ -66,11 +66,7 @@ ASYNC_MODE = "eventlet"
 # Flask-SocketIO.
 socketio = SocketIO(app, async_mode=ASYNC_MODE, json=NumpyJSON)
 
-pages = [
-    "viewer",
-    "loader",
-    "blank",
-]
+pages = ["viewer", "loader"]
 
 
 @app.route('/<page_name>')
