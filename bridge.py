@@ -11,6 +11,7 @@ from typing import Optional
 
 from flask_socketio import SocketIO
 
+from lib.numpy_json import NumpyJSON
 from napari_client import NapariClient
 
 LOGGER = logging.getLogger("webmon")
@@ -140,10 +141,7 @@ class NapariBridge:
         layer_data = self._get_layer_data(poll_data)
 
         if layer_data:
-            LOGGER.info(
-                "set_layer_data corner = %f",
-                layer_data['tile_state']['corners'][0][0],
-            )
+            LOGGER.info("layer_data = %s", NumpyJSON.pretty(layer_data))
 
             self._socketio.emit(
                 'set_layer_data', layer_data, namespace='/test'

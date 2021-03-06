@@ -32,3 +32,7 @@ class NumpyJSON:
     @staticmethod
     def loads(obj, *args, **kwargs):
         return json.loads(obj, *args, **kwargs)
+
+    @staticmethod
+    def pretty(obj):
+        return json.dumps(obj, indent=4, cls=NumpyJSONEncoder)
