@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+	.webgl {
+		height: 800px
+	}
+</style>
+
+<div class="overflow-hidden	">
+	<div id="WebGLContainer" class=webgl></div>
+</div>
+
+<script type="module">
+	import { startPoints } from '/static/points.js';
+	startPoints();
+</script>
+{% endblock %}
